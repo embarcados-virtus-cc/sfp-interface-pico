@@ -3,6 +3,7 @@
  * @brief Biblioteca de parsing SFF-8472 – Base ID (A0h)
  *
  * @author Alexandre Junior
+ * @author Miguel Ryan
  * @date 2026-01-10
  *
  * @details
@@ -26,7 +27,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-
+#include <string.h>
 
 #include "hardware/i2c.h"
 #include "pico/types.h"
@@ -48,7 +49,6 @@
 /*==========================================
  * Byte 0 — Identifier (SFF-8472 / SFF-8024)
  ===========================================*/
-
 typedef enum {
     SFP_ID_UNKNOWN   = 0x00,
     SFP_ID_GBIC      = 0x02,
@@ -57,7 +57,6 @@ typedef enum {
     SFP_ID_QSFP_PLUS = 0x11,
     SFP_ID_QSFP28    = 0x18
 } sfp_identifier_t;
-
 
 /*
  * Status da informação de alcance OM1
@@ -79,31 +78,121 @@ typedef enum {
 } sfp_om4_length_status_t;
 
 
+/**
+ * @brief Códigos de Conformidade de Especificação Estendida (Tabela 4-4 do SFF-8024)
+ *
+ * @details
+ *  Códigos que identificam capacidades do módulo não cobertas pelas tabelas básicas.
+ *  Usados pelo SFF-8472 (Byte 36) e SFF-8636 (Bytes 116, 192) para reportar
+ *  suporte a interfaces ópticas/elétricas (AOC/ACC, variantes Ethernet, FC, etc.).
+ *
+ *  Nota: Códigos 0x80-0x81 não são para dispositivos single-lane SFF-8472.
+ *        0x82-0xFE reservados, 0xFF específico do fabricante.
+ *
+ *  Referência: SFF-8024 Rev 4.13, Seção 4.5, Páginas 20-22.
+ */
+
+typedef enum {
+    EXT_SPEC_COMPLIANCE_UNSPECIFIED = 0x00,
+    EXT_SPEC_COMPLIANCE_100G_AOC_OR_25GAUI_C2M_AOC_BER_5E_5 = 0x01,
+    EXT_SPEC_COMPLIANCE_100GBASE_SR4_OR_25GBASE_SR = 0x02,
+    EXT_SPEC_COMPLIANCE_100GBASE_LR4_OR_25GBASE_LR = 0x03,
+    EXT_SPEC_COMPLIANCE_100GBASE_ER4_OR_25GBASE_ER = 0x04,
+    EXT_SPEC_COMPLIANCE_100GBASE_SR10 = 0x05,
+    EXT_SPEC_COMPLIANCE_100G_CWDM4 = 0x06,
+    EXT_SPEC_COMPLIANCE_100G_PSM4 = 0x07,
+    EXT_SPEC_COMPLIANCE_100G_ACC_OR_25GAUI_C2M_ACC_BER_5E_5 = 0x08,
+    EXT_SPEC_COMPLIANCE_OBSOLETE = 0x09,
+    EXT_SPEC_COMPLIANCE_RESERVED_0A = 0x0A,
+    EXT_SPEC_COMPLIANCE_100GBASE_CR4_OR_25GBASE_CR_CA_25G_L_OR_50GBASE_CR2_RS_FEC = 0x0B,
+    EXT_SPEC_COMPLIANCE_25GBASE_CR_CA_25G_S_OR_50GBASE_CR2_BASE_R_FEC = 0x0C,
+    EXT_SPEC_COMPLIANCE_25GBASE_CR_CA_25G_N_OR_50GBASE_CR2_NO_FEC = 0x0D,
+    EXT_SPEC_COMPLIANCE_10MB_SINGLE_PAIR_ETHERNET = 0x0E,
+    EXT_SPEC_COMPLIANCE_RESERVED_0F = 0x0F,
+    EXT_SPEC_COMPLIANCE_40GBASE_ER4 = 0x10,
+    EXT_SPEC_COMPLIANCE_4X_10GBASE_SR = 0x11,
+    EXT_SPEC_COMPLIANCE_40G_PSM4 = 0x12,
+    EXT_SPEC_COMPLIANCE_G9591_P111_2D1 = 0x13,
+    EXT_SPEC_COMPLIANCE_G9591_P151_2D2 = 0x14,
+    EXT_SPEC_COMPLIANCE_G9591_P111_2D2 = 0x15,
+    EXT_SPEC_COMPLIANCE_10GBASE_T_SFI = 0x16,
+    EXT_SPEC_COMPLIANCE_100G_CLR4 = 0x17,
+    EXT_SPEC_COMPLIANCE_100G_AOC_OR_25GAUI_C2M_AOC_BER_1E_12 = 0x18,
+    EXT_SPEC_COMPLIANCE_100G_ACC_OR_25GAUI_C2M_ACC_BER_1E_12 = 0x19,
+    EXT_SPEC_COMPLIANCE_100GE_DWDM2 = 0x1A,
+    EXT_SPEC_COMPLIANCE_100G_1550NM_WDM_4L = 0x1B,
+    EXT_SPEC_COMPLIANCE_10GBASE_T_SHORT_REACH = 0x1C,
+    EXT_SPEC_COMPLIANCE_5GBASE_T = 0x1D,
+    EXT_SPEC_COMPLIANCE_2_5GBASE_T = 0x1E,
+    EXT_SPEC_COMPLIANCE_40G_SWDM4 = 0x1F,
+    EXT_SPEC_COMPLIANCE_100G_SWDM4 = 0x20,
+    EXT_SPEC_COMPLIANCE_100G_PAM4_BIDI = 0x21,
+    EXT_SPEC_COMPLIANCE_4WDM_10_MSA = 0x22,
+    EXT_SPEC_COMPLIANCE_4WDM_20_MSA = 0x23,
+    EXT_SPEC_COMPLIANCE_4WDM_40_MSA = 0x24,
+    EXT_SPEC_COMPLIANCE_100GBASE_DR_CAUI4_NO_FEC = 0x25,
+    EXT_SPEC_COMPLIANCE_100G_FR_OR_100GBASE_FR1_CAUI4_NO_FEC = 0x26,
+    EXT_SPEC_COMPLIANCE_100G_LR_OR_100GBASE_LR1_CAUI4_NO_FEC = 0x27,
+    EXT_SPEC_COMPLIANCE_100GBASE_SR1_CAUI4_NO_FEC = 0x28,
+    EXT_SPEC_COMPLIANCE_100GBASE_SR1_OR_200GBASE_SR2_OR_400GBASE_SR4 = 0x29,
+    EXT_SPEC_COMPLIANCE_100GBASE_FR1_OR_400GBASE_DR4_2 = 0x2A,
+    EXT_SPEC_COMPLIANCE_100GBASE_LR1 = 0x2B,
+    EXT_SPEC_COMPLIANCE_100G_LR1_20_MSA_CAUI4_NO_FEC = 0x2C,
+    EXT_SPEC_COMPLIANCE_100G_FR1_30_MSA_CAUI4_NO_FEC = 0x2D,
+    EXT_SPEC_COMPLIANCE_100G_FR1_40_MSA_CAUI4_NO_FEC = 0x2E,
+    EXT_SPEC_COMPLIANCE_100G_LR1_20_MSA = 0x2F,
+    EXT_SPEC_COMPLIANCE_ACTIVE_CU_CABLE_50GAUI_100GAUI2_200GAUI4_C2M_BER_1E_6 = 0x30,
+    EXT_SPEC_COMPLIANCE_ACTIVE_OPTICAL_CABLE_50GAUI_100GAUI2_200GAUI4_C2M_BER_1E_6 = 0x31,
+    EXT_SPEC_COMPLIANCE_ACTIVE_CU_CABLE_50GAUI_100GAUI2_200GAUI4_C2M_BER_2_6E_4 = 0x32,
+    EXT_SPEC_COMPLIANCE_ACTIVE_OPTICAL_CABLE_50GAUI_100GAUI2_200GAUI4_C2M_BER_2_6E_4 = 0x33,
+    EXT_SPEC_COMPLIANCE_100G_FR1_30_MSA = 0x34,
+    EXT_SPEC_COMPLIANCE_100G_FR1_40_MSA = 0x35,
+    EXT_SPEC_COMPLIANCE_100GBASE_VR1_CAUI4_NO_FEC = 0x36,
+    EXT_SPEC_COMPLIANCE_10GBASE_BR = 0x37,
+    EXT_SPEC_COMPLIANCE_25GBASE_BR = 0x38,
+    EXT_SPEC_COMPLIANCE_50GBASE_BR = 0x39,
+    EXT_SPEC_COMPLIANCE_100GBASE_VR1_CAUI4_NO_FEC_2 = 0x3A, // Nota: Aparece duas vezes na tabela
+    EXT_SPEC_COMPLIANCE_RESERVED_3B = 0x3B,
+    EXT_SPEC_COMPLIANCE_RESERVED_3C = 0x3C,
+    EXT_SPEC_COMPLIANCE_RESERVED_3D = 0x3D,
+    EXT_SPEC_COMPLIANCE_RESERVED_3E = 0x3E,
+    EXT_SPEC_COMPLIANCE_100GBASE_CR1_OR_200GBASE_CR2_OR_400GBASE_CR4 = 0x3F,
+    EXT_SPEC_COMPLIANCE_50GBASE_CR_OR_100GBASE_CR2_OR_200GBASE_CR4 = 0x40,
+    EXT_SPEC_COMPLIANCE_50GBASE_R_OR_100GBASE_SR2_OR_200GBASE_SR4 = 0x41,
+    EXT_SPEC_COMPLIANCE_50GBASE_FR_OR_200GBASE_DR4 = 0x42,
+    EXT_SPEC_COMPLIANCE_200GBASE_FR4 = 0x43,
+    EXT_SPEC_COMPLIANCE_200G_1550NM_PSM4 = 0x44,
+    EXT_SPEC_COMPLIANCE_50GBASE_LR = 0x45,
+    EXT_SPEC_COMPLIANCE_200GBASE_LR4 = 0x46,
+    EXT_SPEC_COMPLIANCE_400GBASE_DR4_400GAUI4_C2M = 0x47,
+    EXT_SPEC_COMPLIANCE_400GBASE_FR4 = 0x48,
+    EXT_SPEC_COMPLIANCE_400GBASE_LR4_6 = 0x49,
+    EXT_SPEC_COMPLIANCE_RESERVED_4A = 0x4A,
+    EXT_SPEC_COMPLIANCE_400G_LR4_10 = 0x4B,
+    EXT_SPEC_COMPLIANCE_400GBASE_ZR_OBSOLETE = 0x4C,
+    // 0x4D–0x7E are reserved
+    EXT_SPEC_COMPLIANCE_256GFC_SW4 = 0x7F,
+    EXT_SPEC_COMPLIANCE_64GFC = 0x80,
+    EXT_SPEC_COMPLIANCE_128GFC = 0x81,
+    // 0x82–0xFE are reserved
+    EXT_SPEC_COMPLIANCE_VENDOR_SPECIFIC = 0xFF
+} sfp_extended_spec_compliance_code_t;
+
+
+
 /**********************************************
  * A0h Memory Map (128 bytes) - Base ID Fields
  **********************************************/
 
 typedef struct {
     /* Byte 0: Identifier */
-     sfp_identifier_t identifier;           // Table 5-1
+    sfp_identifier_t identifier;           // Table 5-1
 
     /* Byte 1: Extended Identifier */
     uint8_t ext_identifier;       // Table 5-2
 
     /* Byte 2: Connector */
     uint8_t connector;            // SFF-8024
-
-    /* Bytes 3-10: Transceiver Compliance Codes */
-    struct {
-        uint8_t byte3;   // Ethernet/InfiniBand/ESON bits
-        uint8_t byte4;   // SONET/SFP+ Cable Tech/Fibre Channel Media
-        uint8_t byte5;   // Fibre Channel Media/Speed
-        uint8_t byte6;   // Ethernet Compliance
-        uint8_t byte7;   // Fibre Channel Link Length
-        uint8_t byte8;   // Fibre Channel Technology
-        uint8_t byte9;   // Fibre Channel Speed
-        uint8_t byte10;  // Fibre Channel Speed 2
-    } compliance_codes;
 
     /* Byte 11: Encoding */
     uint8_t encoding;             // SFF-8024
@@ -138,7 +227,7 @@ typedef struct {
     char vendor_name[16];
 
     /* Byte 36: Extended Compliance Codes */
-    uint8_t ext_compliance;       // SFF-8024 Table 4-4
+    sfp_extended_spec_compliance_code_t ext_compliance;       // SFF-8024 Table 4-4
 
     /* Bytes 37-39: Vendor OUI */
     uint8_t vendor_oui[3];
@@ -164,6 +253,112 @@ typedef struct {
     /* Byte 63: CC_BASE (Checksum) */
     uint8_t cc_base;
 } sfp_a0h_base_t;
+
+/* Bytes 3-10: Transceiver Compliance Codes */
+typedef struct {
+    uint8_t byte3;   // Ethernet/InfiniBand/ESON bits
+    uint8_t byte4;   // SONET/SFP+ Cable Tech/Fibre Channel Media
+    uint8_t byte5;   // Fibre Channel Media/Speed
+    uint8_t byte6;   // Ethernet Compliance
+    uint8_t byte7;   // Fibre Channel Link Length
+    uint8_t byte8;   // Fibre Channel Technology
+    uint8_t byte9;   // Fibre Channel Speed
+    uint8_t byte10;  // Fibre Channel Speed 2
+} sfp_compliance_codes_t;
+
+typedef struct {
+    /* ==============================
+     * Byte 3 — Ethernet / InfiniBand
+     * ============================== */
+    bool eth_10g_base_sr;
+    bool eth_10g_base_lr;
+    bool eth_10g_base_lrm;
+    bool eth_10g_base_er;
+    bool infiniband_1x_sx;
+    bool infiniband_1x_lx;
+    bool infiniband_1x_copper_active;
+    bool infiniband_1x_copper_passive;
+
+    /* ======================
+     * Byte 4 — ESCON / SONET
+     * ====================== */
+    bool escon_mmf;
+    bool escon_smf;
+    bool oc_192_sr;
+    bool sonet_rs_1;
+    bool sonet_rs_2;
+    bool oc_48_lr;
+    bool oc_48_ir;
+    bool oc_48_sr;
+
+    /* ======================
+     * Byte 5 — SONET
+     * ====================== */
+    bool oc_12_sm_lr;
+    bool oc_12_sm_ir;
+    bool oc_12_sr;
+    bool oc_3_sm_lr;
+    bool oc_3_sm_ir;
+    bool oc_3_sr;
+
+    /* ======================
+     * Byte 6 — Ethernet 1G
+     * ====================== */
+    bool eth_base_px;
+    bool eth_base_bx_10;
+    bool eth_100_base_fx;
+    bool eth_100_base_lx;
+    bool eth_1000_base_t;
+    bool eth_1000_base_cx;
+    bool eth_1000_base_lx;
+    bool eth_1000_base_sx;
+
+    /* ====================================
+     * Byte 7 — FC Link Length & Technology
+     * ==================================== */
+    bool fc_very_long_distance;
+    bool fc_short_distance;
+    bool fc_intermediate_distance;
+    bool fc_long_distance;
+    bool fc_medium_distance;
+    bool shortwave_laser_sa;
+    bool longwave_laser_lc;
+    bool electrical_inter_enclosure;
+
+    /* ==============================================
+     * Byte 8 — FC technology & SFP+ Cable Technology
+     * ============================================== */
+    bool electrical_intra_enclosure;
+    bool shortwave_laser_sn;
+    bool shortwave_laser_sl;
+    bool longwave_laser_ll;
+    bool active_cable;
+    bool passive_cable;
+
+    /* ==============================
+     * Byte 9 — FC Transmission Media
+     * ============================== */
+    bool twin_axial_pair;
+    bool twisted_pair;
+    bool miniature_coax;
+    bool video_coax;
+    bool multimode_m6; // 62.5 um
+    bool multimode_m5; // 50 um
+    bool single_mode;
+
+    /* ==============================
+     * Byte 10 — FC Channel Speed
+     * ============================== */
+    bool cs_1200_mbps;
+    bool cs_800_mbps;
+    bool cs_1600_mbps;
+    bool cs_400_mbps;
+    bool cs_3200_mbps;
+    bool cs_200_mbps;
+    bool see_byte_62;
+    bool cs_100_mbps;
+} sfp_compliance_decoded_t;
+
 /**********************************************
  * Function Prototypes for Library
  **********************************************/
@@ -182,6 +377,19 @@ bool sfp_read_block(i2c_inst_t *i2c,uint8_t dev_addr,uint8_t start_offset,uint8_
 void sfp_parse_a0_base_identifier(const uint8_t *a0_base_data,sfp_a0h_base_t *a0);
 sfp_identifier_t sfp_a0_get_identifier(const sfp_a0h_base_t *a0);
 
+/* Byte 3-10 Compliance Codes */
+void sfp_read_compliance(const uint8_t *a0_base_data, sfp_compliance_codes_t *cc);
+static void decode_byte3(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out);
+static void decode_byte4(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out);
+static void decode_byte5(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out);
+static void decode_byte6(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out);
+static void decode_byte7(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out);
+static void decode_byte8(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out);
+static void decode_byte9(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out);
+static void decode_byte10(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out);
+void sfp_decode_compliance(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out);
+void sfp_print_compliance(const sfp_compliance_decoded_t *c);
+
 /* Byte 17 OM1 (62.5 um) */
 void sfp_parse_a0_base_om1(const uint8_t *a0_base_data,sfp_a0h_base_t *a0);
 uint16_t sfp_a0_get_om1_length_m(const sfp_a0h_base_t *a0,sfp_om1_length_status_t *status);
@@ -189,6 +397,10 @@ uint16_t sfp_a0_get_om1_length_m(const sfp_a0h_base_t *a0,sfp_om1_length_status_
 /* Byte 18 OM4 or copper cable */
 void sfp_parse_a0_base_om4_or_copper(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
 uint16_t sfp_a0_get_om4_copper_or_length_m(const sfp_a0h_base_t *a0, sfp_om4_length_status_t *status);
+
+/*Byte 36 Extended Compliance Codes) */
+void sfp_parse_a0_base_ext_compliance(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
+sfp_extended_spec_compliance_code_t sfp_a0_get_ext_compliance(const sfp_a0h_base_t *a0);
 
 
 #endif /* SFF_8472_H */
