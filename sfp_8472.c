@@ -1,6 +1,7 @@
 #include "sfp_8472.h"
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
+#include <stdio.h>
 #include <stdint.h>
 
 
