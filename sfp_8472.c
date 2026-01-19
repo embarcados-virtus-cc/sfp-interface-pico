@@ -683,9 +683,9 @@ void sfp_parse_a0_base_connector(const uint8_t *a0_base_data, sfp_a0h_base_t *a0
     if (!a0_base_data || !a0)
         return;
 
-    a0->connector_raw = a0_base_data[2];
+    uint8_t connector_raw = a0_base_data[2];
 
-    a0->connector = (sfp_connector_type_t)a0->connector_raw;
+    a0->connector = (sfp_connector_type_t)connector_raw;
 }
 
 
