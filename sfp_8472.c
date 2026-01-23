@@ -363,6 +363,119 @@ void sfp_print_compliance(const sfp_compliance_decoded_t *c)
     if (c->cs_100_mbps)  printf("  - 100 Mbps\n");
 }
 
+void sfp_parse_a0_base_encoding(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    a0->encoding = (sfp_encoding_codes_t)a0_base_data[11];
+}
+
+sfp_encoding_codes_t sfp_a0_get_encoding(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return SFP_ENC_UNSPECIFIED;
+
+    return a0->encoding;
+}
+
+void sfp_print_encoding(sfp_encoding_codes_t encoding)
+{
+    printf("\n[Byte 11] Encoding:\n");
+
+    switch ((uint8_t)encoding) {
+        case SFP_ENC_UNSPECIFIED:
+            printf("  - Unspecified\n");
+            break;
+        case SFP_ENC_8B_10B:
+            printf("  - 8B/10B\n");
+            break;
+        case SFP_ENC_4B_5B:
+            printf("  - 4B/5B\n");
+            break;
+        case SFP_ENC_NRZ:
+            printf("  - NRZ\n");
+            break;
+        case SFP_ENC_MANCHESTER:
+            printf("  - Manchester\n");
+            break;
+        case SFP_ENC_SONET_SCRAMBLED:
+            printf("  - SONET Scrambled\n");
+            break;
+        case SFP_ENC_64B_66B:
+            printf("  - 64B/66B\n");
+            break;
+        case SFP_ENC_256B_257B:
+            printf("  - 256B/257B\n");
+            break;
+        case SFP_ENC_PAM4:
+            printf("  - PAM4\n");
+            break;
+        default:
+            printf("  - Reserved / Unknown Code (0x%02X)\n", (uint8_t)encoding);
+            break;
+    }
+}
+
+/*
+ * Parsing do Byte 16 (OM2, 50 µm)
+ */
+void sfp_parse_a0_base_om2(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    /* =========================================================
+     * Byte 16 — Length (OM2, 50 µm)
+     * =========================================================*/
+    uint8_t raw = a0_base_data[16];
+
+    /*
+     * Fluxo Principal + Secundários
+     */
+    if (raw == 0x00) {
+        /*
+         * Fluxo Secundário 2 (caso 00h):
+         * Não suportado ou deve ser determinado por outros meios.
+         */
+        a0->om2_status   = SFP_OM2_LEN_NOT_SUPPORTED;
+        a0->om2_length_m = 0;
+    }
+    else if (raw == 0xFF) {
+        /*
+         * Fluxo Secundário 2 (caso FFh):
+         * Alcance > 2.54 km.
+         */
+        a0->om2_status   = SFP_OM2_LEN_EXTENDED;
+        a0->om2_length_m = 2540; /* Limite inferior conhecido (254 * 10) */
+    }
+    else {
+        /*
+         * Fluxo Principal:
+         * Valor válido (01h–FEh)
+         * Unidade: 10 metros
+         */
+        a0->om2_status   = SFP_OM2_LEN_VALID;
+        a0->om2_length_m = (uint16_t)raw * 10;
+    }
+}
+
+/*
+ * Getter simples para OM2
+ */
+uint16_t sfp_a0_get_om2_length_m(const sfp_a0h_base_t *a0, sfp_om2_length_status_t *status)
+{
+    if (!a0) {
+        if (status)
+            *status = SFP_OM2_LEN_NOT_SUPPORTED;
+        return 0;
+    }
+
+    if (status)
+        *status = a0->om2_status;
+
+    return a0->om2_length_m;
+}
 
 void sfp_parse_a0_base_om1(const uint8_t *a0_base_data,sfp_a0h_base_t *a0)
 {
@@ -535,4 +648,123 @@ sfp_extended_spec_compliance_code_t sfp_a0_get_ext_compliance(const sfp_a0h_base
         return EXT_SPEC_COMPLIANCE_UNSPECIFIED;
 
     return a0->ext_compliance;
+}
+
+/*
+ * Faz a validação do checksum CC_BASE (Byte 63).
+ * 
+ * O checksum é calculado como a soma dos bytes 0 a 62 (inclusive) mais o byte 63
+ * deve resultar em 0 (ou seja, a soma de todos os bytes 0 a 63 deve ser 0 mod 256).
+ * 
+ * @param a0_base_data Ponteiro para o array de dados A0h (64 bytes)
+ * @param a0 Ponteiro para a estrutura sfp_a0h_base_t onde o resultado será armazenado
+ */
+void sfp_parse_a0_base_cc_base(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    /* Calcula a soma dos bytes 0 a 62 */
+    uint16_t sum = 0;
+    for (int i = 0; i < 63; i++) {
+        sum += a0_base_data[i];
+    }
+
+    /* Converte para 8 bits (modulo 256) */
+    uint8_t sum_mod256 = (uint8_t)(sum & 0xFF);
+
+    /* Adiciona o byte 63 (CC_BASE) */
+    uint8_t checksum_byte = a0_base_data[63];
+
+    /* Verifica se a soma total é  igual ao checksum*/
+   a0->cc_base_is_valid = (sum_mod256 == checksum_byte);
+
+    /* Armazena o byte do checksum para referência */
+    a0->cc_base = checksum_byte;
+}
+
+/*
+ * Retorna o status de validação do checksum CC_BASE.
+ * 
+ * @param a0 Ponteiro para a estrutura sfp_a0h_base_t
+ * @return true se o checksum é válido, false caso contrário
+ */
+bool sfp_a0_get_cc_base_is_valid(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return false;
+
+    return a0->cc_base_is_valid;
+}
+
+/*  
+*   Realiza o parsing do Byte 2 (conector Type)
+*
+*   @param a0_base_data Ponteiro para o buffer contendo os dados lidos
+*   da EEPROM A0h (mínimo de 3 bytes válidos)
+*   @param a0 Ponteiro para a estrutura sfp_a0h_base_t onde as
+*        informações do conector serão armazenadas.
+*
+*   @return Nenhum
+*
+*   
+*/
+void sfp_parse_a0_base_connector(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    uint8_t connector_raw = a0_base_data[2];
+
+    a0->connector = (sfp_connector_type_t)connector_raw;
+}
+
+
+/*
+*    Obtém o tipo de conector do módulo SFP/SFP+.
+*    
+*    @param a0 Ponteiro para a estrutura sfp_a0h_base_t contendo os
+*    dados já parseados do módulo.
+*    @return Valor do tipo sfp_connector_type_t que identifica o
+*    conector físico do módulo, conforme SFF-8024.
+*/
+sfp_connector_type_t sfp_a0_get_connector(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return SFP_CONNECTOR_UNKNOWN;
+
+    return a0->connector;
+}
+
+/*
+*   Converte o tipo de conector SFP para uma representação textual.
+*   @param connector Valor do tipo sfp_connector_type_t que representa
+*   o tipo de conector físico do módulo.
+*
+*   @return Ponteiro para uma string constante contendo a descrição
+*   textual do conector. Caso o valor seja desconhecido ou
+*   não suportado, retorna "Unknown Connector".
+*/
+const char *sfp_connector_to_string(sfp_connector_type_t connector)
+{
+    switch (connector) {
+        case SFP_CONNECTOR_SC:              return "SC";
+        case SFP_CONNECTOR_FC_STYLE_1:      return "Fibre Channel Style 1";
+        case SFP_CONNECTOR_FC_STYLE_2:      return "Fibre Channel Style 2";
+        case SFP_CONNECTOR_BNC_TNC:          return "BNC/TNC";
+        case SFP_CONNECTOR_FC_COAX:          return "Fibre Channel Coax";
+        case SFP_CONNECTOR_FIBER_JACK:       return "Fiber Jack";
+        case SFP_CONNECTOR_LC:               return "LC";
+        case SFP_CONNECTOR_MT_RJ:            return "MT-RJ";
+        case SFP_CONNECTOR_MU:               return "MU";
+        case SFP_CONNECTOR_SG:               return "SG";
+        case SFP_CONNECTOR_OPTICAL_PIGTAIL:  return "Optical Pigtail";
+        case SFP_CONNECTOR_MPO_1X12:         return "MPO 1x12";
+        case SFP_CONNECTOR_MPO_2X16:         return "MPO 2x16";
+        case SFP_CONNECTOR_HSSDC_II:         return "HSSDC II";
+        case SFP_CONNECTOR_COPPER_PIGTAIL:   return "Copper Pigtail";
+        case SFP_CONNECTOR_RJ45:             return "RJ45";
+        case SFP_CONNECTOR_NO_SEPARABLE:     return "No Separable Connector";
+        default:                             return "Unknown Connector";
+    }
 }
