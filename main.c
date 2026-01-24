@@ -208,7 +208,7 @@ int main(void)
         Byte 2 - Leitura do Conector
      * =================================== */
     printf("Connector: %s (0x%02X)\n",sfp_connector_to_string(a0.connector),a0_base_data[2]);
-    
+
     /* =============================================================
      * Teste do Byte 1 — Extended Identifier (RF-02)
      * ============================================================= */
@@ -228,7 +228,7 @@ int main(void)
     } else {
         printf("\nRF-02: pulado (pre-condicao: Byte 0 precisa ser 0x03 / SFP).\n");
     }
-    
+
     /* =============================================================
      * Teste dos Bytes 3-10 — Códigos de Conformidade do Transceptor
      * ============================================================= */
@@ -243,10 +243,10 @@ int main(void)
     /* =====================================================
      * Teste do Byte 11 — Encoding
      * ===================================================== */
-    sfp_encoding_codes_t encoding_code = sfp_a0_get_encoding(&a0); 
-    
+    sfp_encoding_codes_t encoding_code = sfp_a0_get_encoding(&a0);
+
     sfp_print_encoding(encoding_code);
-    
+
     /* =====================================================
      * Teste do Byte 14 — Length SMF or Copper Attenuation
      * ===================================================== */
@@ -267,7 +267,7 @@ int main(void)
         printf("Alcance SMF ou atenuação de cobre não especificado\n");
         break;
     }
-    
+
     /* =====================================================
      * Teste do Byte 16 — Length OM2 (50 µm)
      * ===================================================== */
@@ -288,7 +288,7 @@ int main(void)
         printf("Alcance OM2 não especificado ou não suportado\n");
         break;
     }
-    
+
     /* =====================================================
      * Teste do Byte 17 — Length OM1 (62.5 µm)
      * ===================================================== */
@@ -339,54 +339,26 @@ int main(void)
     printf("\nByte 36 — Extended Specification Compliance Code: 0x%02X\n", ext_comp);
     printf("Descrição: %s\n", ext_compliance_to_string(ext_comp));
 
-    /* Mostrar o valor bruto do byte 36*/
     printf("Valor bruto (Byte 36): 0x%02X\n", a0_base_data[36]);
 
     /* =====================================================
-     * Teste da Task #24 (RF-19) - Fibre Channel Speed 2
+     * Teste do Byte 36 — Extended Specification Compliance Codes
      * ===================================================== */
-    
-    /* 1. Validar dependência com Byte 10 (conforme SFF-8472) */
-    printf("\n=== Fibre Channel Speed 2 (Byte 62) — Task #24 (RF-19) ===\n");
-    printf("Pré-condição: Byte 10, Bit 1 (see_byte_62) deve estar ativo\n");
-    
-   
+    printf("\nByte 62 — Fibre Channel Speed 2\n");
+
     if (!comp.see_byte_62) {
-        printf("\n⚠ STATUS: Byte 10 NÃO indica capacidades estendidas.\n");
-        printf("  Ação conforme SFF-8472: O conteúdo do Byte 62 (0x%02X) deve ser IGNORADO.\n", a0_base_data[62]);
-        printf("  Explicação: Pré-condição falhou — vide SFF-8472 Section 8.3.1\n");
+        printf("\nByte 10 não indica capacidades estendidas.\n");
     }
     else {
-        printf("\n✓ STATUS: Pré-condição atendida — Byte 10 Bit 1 = 1 (see_byte_62 ativo)\n");
-        printf("  Valor Bruto Byte 62: 0x%02X\n", a0.fc_speed2);
-        
-        /* 2. Obter valor do Byte 62 */
-        uint8_t fc_speed2_raw = sfp_a0_get_fc_speed_2(&a0);
-        printf("  Valor obtido via getter: 0x%02X\n", fc_speed2_raw);
-        
-        /* 3. Verificar suporte a velocidades estendidas */
-        sfp_extended_spec_compliance_code_t ext_comp_code = sfp_a0_get_ext_compliance(&a0);
-        
-        /* 4. Validar 64GFC especificamente */
-        if (sfp_check_64gfc_support(&a0, &comp)) {
-            printf("\n  ✓ 64GFC SUPORTADO\n");
-            printf("    - Byte 36 contém: EXT_SPEC_COMPLIANCE_64GFC (0x80)\n");
-            printf("    - Módulo compatível com 64 Gigabit Fibre Channel\n");
+        printf("Valor Bruto Byte 62: 0x%02X\n", a0.fc_speed2);
+
+        if (sfp_get_a0_fc_speed_2(&a0, &comp)) {
+            printf("\n64GFC SUPORTADO\n");
         }
         else {
-            printf("\n  ✗ 64GFC NÃO suportado\n");
-            printf("    - Byte 36: 0x%02X (%s)\n", ext_comp_code, ext_compliance_to_string(ext_comp_code));
-            printf("    - Byte 62 pode conter outras velocidades (ver SFF-8024)\n");
-        }
-        
-        /* 5. Verificar suporte a 128GFC também */
-        if (ext_comp_code == EXT_SPEC_COMPLIANCE_128GFC) {
-            printf("\n  ✓ 128GFC SUPORTADO\n");
-            printf("    - Módulo compatível com 128 Gigabit Fibre Channel\n");
+            printf("\n64GFC NÃO suportado\n");
         }
     }
-    
-    printf("\nReferência: SFF-8472 Section 8.3.1 (Fibre Channel Speed 2)\n");
 
     /* =====================================================
      * Teste do Byte 63 — CC_BASE (Checksum)
@@ -395,7 +367,7 @@ int main(void)
 
     printf("\nByte 63 — CC_BASE (Checksum):\n");
     printf("Valor: 0x%02X\n", a0_base_data[63]);
-    
+
     if (cc_base_valid) {
         printf("Status: ✓ Checksum VÁLIDO\n");
     } else {
