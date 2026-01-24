@@ -283,8 +283,8 @@ typedef struct {
     uint16_t om1_length_m;           /* Distância convertida (metros) */
     sfp_om1_length_status_t om1_status;
 
-    uint16_t om4_or_cooper_length_m;
-    sfp_om4_length_status_t om4_or_cooper_status;
+    uint16_t om4_or_copper_length_m;
+    sfp_om4_length_status_t om4_or_copper_status;
 
     /* Bytes 14-19: Link Lengths (MODIFICAR,ESTA ESTRUTURA NÃO É APROPRIADA PARA ESSA DADOS) */
 
@@ -334,14 +334,14 @@ typedef struct {
 
 /* Bytes 3-10: Transceiver Compliance Codes */
 typedef struct {
-    uint8_t byte3;   // Ethernet/InfiniBand/ESON bits
-    uint8_t byte4;   // SONET/SFP+ Cable Tech/Fibre Channel Media
-    uint8_t byte5;   // Fibre Channel Media/Speed
-    uint8_t byte6;   // Ethernet Compliance
-    uint8_t byte7;   // Fibre Channel Link Length
-    uint8_t byte8;   // Fibre Channel Technology
-    uint8_t byte9;   // Fibre Channel Speed
-    uint8_t byte10;  // Fibre Channel Speed 2
+    uint8_t byte3;
+    uint8_t byte4;
+    uint8_t byte5;
+    uint8_t byte6;
+    uint8_t byte7;
+    uint8_t byte8;
+    uint8_t byte9;
+    uint8_t byte10;
 } sfp_compliance_codes_t;
 
 typedef struct {

@@ -661,8 +661,8 @@ void sfp_parse_a0_base_om4_or_copper(const uint8_t *a0_base_data, sfp_a0h_base_t
          * Fluxo Secundário 2 (caso 00h):
          * Não há informação explícita de comprimento de OM4 ou o cobre sem informação válida.
          */
-        a0->om4_or_cooper_status = SFP_OM4_LEN_NOT_SUPPORTED;
-        a0->om4_or_cooper_length_m = 0;
+        a0->om4_or_copper_status = SFP_OM4_LEN_NOT_SUPPORTED;
+        a0->om4_or_copper_length_m = 0;
     }
     else if (raw_length == 0xFF) {
         /*
@@ -675,12 +675,12 @@ void sfp_parse_a0_base_om4_or_copper(const uint8_t *a0_base_data, sfp_a0h_base_t
          *
          * O valor armazenado representa o limite inferior conhecido.
          */
-        a0->om4_or_cooper_status = SFP_OM4_LEN_EXTENDED;
+        a0->om4_or_copper_status = SFP_OM4_LEN_EXTENDED;
 
         if (is_copper)
-            a0->om4_or_cooper_length_m = 254;
+            a0->om4_or_copper_length_m = 254;
         else
-            a0->om4_or_cooper_length_m = 2540;
+            a0->om4_or_copper_length_m = 2540;
     }
     else {
         /*
@@ -690,12 +690,12 @@ void sfp_parse_a0_base_om4_or_copper(const uint8_t *a0_base_data, sfp_a0h_base_t
          * - OM4: unidades de 10 metros
          * - Cabo de cobre: unidades de 1 metro
          */
-        a0->om4_or_cooper_status = SFP_OM4_LEN_VALID;
+        a0->om4_or_copper_status = SFP_OM4_LEN_VALID;
 
         if (is_copper)
-            a0->om4_or_cooper_length_m = raw_length;
+            a0->om4_or_copper_length_m = raw_length;
         else
-            a0->om4_or_cooper_length_m = (uint16_t)raw_length * 10;
+            a0->om4_or_copper_length_m = (uint16_t)raw_length * 10;
     }
 }
 
@@ -713,9 +713,9 @@ uint16_t sfp_a0_get_om4_copper_or_length_m(const sfp_a0h_base_t *a0, sfp_om4_len
     }
 
     if (status)
-        *status = a0->om4_or_cooper_status;
+        *status = a0->om4_or_copper_status;
 
-    return a0->om4_or_cooper_length_m;
+    return a0->om4_or_copper_length_m;
 }
 
 /*
@@ -826,7 +826,6 @@ uint32_t sfp_vendor_oui_to_u32(const sfp_a0h_base_t *a0)
            ((uint32_t)a0->vendor_oui[1] << 8)  |
            ((uint32_t)a0->vendor_oui[2]);
 }
-]
 
 /*
 * Getter Simples
