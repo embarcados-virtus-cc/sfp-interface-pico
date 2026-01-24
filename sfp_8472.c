@@ -1,6 +1,7 @@
 #include "sfp_8472.h"
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
+#include <stdio.h>
 #include <stdint.h>
 
 
@@ -75,6 +76,36 @@ sfp_identifier_t sfp_a0_get_identifier(const sfp_a0h_base_t *a0)
     return a0->identifier;
 }
 
+/*
+ * RF-02: Byte 1 — Extended Identifier
+ */
+void sfp_parse_a0_base_ext_identifier(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    a0->ext_identifier = a0_base_data[1];  // Byte 1
+}
+
+uint8_t sfp_a0_get_ext_identifier(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return 0x00;
+
+    return a0->ext_identifier;
+}
+
+bool sfp_rf02_validate_ext_identifier(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return false;
+
+    return (a0->ext_identifier == SFP_EXT_IDENTIFIER_EXPECTED);
+}
+
+
+
+
 void sfp_read_compliance(const uint8_t *a0_base_data, sfp_compliance_codes_t *cc)
 {
     if (!a0_base_data || !cc)
@@ -88,6 +119,98 @@ void sfp_read_compliance(const uint8_t *a0_base_data, sfp_compliance_codes_t *cc
     cc->byte8  = a0_base_data[8];
     cc->byte9  = a0_base_data[9];
     cc->byte10 = a0_base_data[10];
+}
+
+/*
+ * Parsing do Byte 14 (SMF Length or Copper Attenuation)
+ * 
+ * @details
+ *  - Para fibra SMF: Representa o alcance em quilômetros (km)
+ *    Unidade: 1 km (valor 0x01 = 1 km, 0x64 = 100 km)
+ *  
+ *  - Para cabo de cobre: Representa a atenuação em dB/100m
+ *    Unidade: 0.5 dB/100m (valor 0x01 = 0.5 dB/100m)
+ *  
+ *  - Valores especiais:
+ *    0x00: Não suportado ou informação não disponível
+ *    0xFF: Valor superior ao máximo representável (> 254 km ou > 127 dB/100m)
+ */
+void sfp_parse_a0_base_smf(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    /* =========================================================
+     * Byte 14 — Length (SMF) or Attenuation (Copper)
+     * =========================================================*/
+    uint8_t raw = a0_base_data[14];
+    /* =========================================================
+     * Byte 8 — Natureza física do meio
+     * =========================================================*/
+    uint8_t byte8 = a0_base_data[8];
+
+    bool is_copper = sfp_is_copper(byte8);
+
+    /*
+     * Fluxo Principal + Secundários
+     */
+    if (raw == 0x00) {
+        /*
+         * Fluxo Secundário 2 (caso 00h):
+         * Não há informação explícita de alcance SMF ou atenuação de cobre.
+         */
+        a0->smf_status   = SFP_SMF_LEN_NOT_SUPPORTED;
+        a0->smf_length_m = 0;
+    }
+    else if (raw == 0xFF) {
+        /*
+         * Fluxo Secundário (caso FFh):
+         * Comprimento/Atenuação superior ao máximo nominal representável.
+         *
+         * - Fibra SMF: alcance > 254 km
+         * - Cabo de cobre: atenuação > 127 dB/100m
+         *
+         * O valor armazenado representa o limite inferior/superior conhecido.
+         */
+        a0->smf_status   = SFP_SMF_LEN_EXTENDED;
+
+        if (is_copper)
+            a0->smf_length_m = 254; /* 254 * 0.5 = 127 dB/100m */
+        else
+            a0->smf_length_m = 254; /* 254 km */
+    }
+    else {
+        /*
+         * Fluxo Principal:
+         * Valor válido (01h–FEh)
+         *
+         * - Fibra SMF: unidade de 1 km (valor direto)
+         * - Cabo de cobre: unidade de 0.5 dB/100m (valor * 0.5)
+         */
+        a0->smf_status   = SFP_SMF_LEN_VALID;
+        a0->smf_length_m = (uint16_t)raw;
+    }
+}
+
+/*
+ * Getter para o alcance SMF ou atenuação de cobre (Byte 14)
+ * 
+ * @param a0 Ponteiro para a estrutura sfp_a0h_base_t
+ * @param status Ponteiro para armazenar o status (pode ser NULL)
+ * @return Alcance em km (SMF) ou atenuação * 2 em dB/100m (cobre)
+ */
+uint16_t sfp_a0_get_smf_length_m(const sfp_a0h_base_t *a0, sfp_smf_length_status_t *status)
+{
+    if (!a0) {
+        if (status)
+            *status = SFP_SMF_LEN_NOT_SUPPORTED;
+        return 0;
+    }
+
+    if (status)
+        *status = a0->smf_status;
+
+    return a0->smf_length_m;
 }
 
 static void decode_byte3(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out)
@@ -608,9 +731,153 @@ void sfp_parse_a0_base_ext_compliance(const uint8_t *a0_base_data, sfp_a0h_base_
 }
 
 /*
-* Getter Simples
+ * Faz o parsing do Byte 62 (Fibre Channel Speed 2)
+ * conforme SFF-8472 Table 5-20
+ *
+ * @details
+ *  O Byte 62 contém códigos de velocidade Fibre Channel adicionais
+ *  que não são contemplados pelo Byte 10 (FC Speed). Este byte fornece
+ *  suporte para velocidades mais altas, como 64GFC e 128GFC.
+ *
+ *  Nota: Conforme SFF-8472 Section 8.3.1, o conteúdo deste byte
+ *  deve ser ignorado a menos que o Byte 10, Bit 1 (see_byte_62) 
+ *  esteja definido como 1.
+ *
+ * @param a0_base_data Ponteiro para o buffer contendo os dados lidos
+ *                     da EEPROM A0h (mínimo de 63 bytes válidos)
+ * @param a0 Ponteiro para a estrutura sfp_a0h_base_t onde o
+ *           valor será armazenado
+ *
+ * @return Nenhum
+ */
+void sfp_parse_a0_fc_speed_2(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    /* Byte 62 — Fibre Channel Speed 2 */
+    a0->fc_speed2 = a0_base_data[62];
+}
+
+/*
+ * Obtém o valor bruto do Byte 62 (Fibre Channel Speed 2)
+ *
+ * @param a0 Ponteiro para a estrutura sfp_a0h_base_t contendo
+ *           os dados já parseados do módulo
+ *
+ * @return Valor bruto (0x00-0xFF) do Byte 62. Caso a estrutura
+ *         seja inválida, retorna 0x00.
+ */
+uint8_t sfp_a0_get_fc_speed_2(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return 0x00;
+
+    return a0->fc_speed2;
+}
+
+/*
+ * Verifica o suporte a 64GFC (64 Gigabit Fibre Channel)
+ *
+ * @details
+ *  Conforme SFF-8472 Section 8.3.1, o suporte a velocidades estendidas
+ *  deve ser verificado em dois passos:
+ *
+ *  1. Verificar se o Byte 10, Bit 1 (see_byte_62) está definido como 1.
+ *     Se não estiver, o Byte 62 deve ser ignorado.
+ *
+ *  2. Se see_byte_62 é 1, verificar se o Byte 62 contém o código
+ *     EXT_SPEC_COMPLIANCE_64GFC (0x80) ou se o Byte 10 já indica
+ *     alguma velocidade FC compatível.
+ *
+ * @param a0 Ponteiro para a estrutura sfp_a0h_base_t contendo
+ *           os dados já parseados (Bytes 10 e 62)
+ * @param comp Ponteiro para a estrutura sfp_compliance_decoded_t
+ *             contendo a decodificação do Byte 10 (compliance codes)
+ *
+ * @return true se 64GFC é suportado, false caso contrário
+ */
+bool sfp_check_64gfc_support(const sfp_a0h_base_t *a0, const sfp_compliance_decoded_t *comp)
+{
+    if (!a0 || !comp)
+        return false;
+
+    /* Step 1: Verificar a pré-condição (Byte 10, Bit 1 — see_byte_62) */
+    if (!comp->see_byte_62) {
+        /* Byte 10 não indica capacidades estendidas */
+        return false;
+    }
+
+    /* Step 2: Se see_byte_62 é 1, verificar o Byte 62 */
+    if (a0->ext_compliance == EXT_SPEC_COMPLIANCE_64GFC) {
+        return true;
+    }
+
+    return false;
+}
+
+/*
+* Realiza a leitura e o parsing do campo Vendor OUI da EEPROM A0h
+* @param a0_base_data Ponteiro para o buffer contendo os dados lidos da EEPROM A0h (mínimo de 40 bytes válidos).
+* @param a0 Ponteiro para a estrutura sfp_a0h_base_t onde o Vendor OUI será armazenado.
+*
+* @return Nenhum.
 */
 
+void sfp_parse_a0_base_vendor_oui(const uint8_t *a0_base_data,
+                                  sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    /* Bytes 37–39: Vendor OUI (IEEE Company Identifier) */
+    a0->vendor_oui[0] = a0_base_data[37]; 
+    a0->vendor_oui[1] = a0_base_data[38];
+    a0->vendor_oui[2] = a0_base_data[39]; 
+}
+
+/*
+*   Obtém o Vendor OUI do módulo SFP/SFP+
+*   @param a0 Ponteiro para a estrutura sfp_a0h_base_t contendo os dados já parseados do módulo.
+*   @param oui_buffer Ponteiro para um buffer de 3 bytes onde o Vendor OUI será copiado, na ordem MSB → LSB.
+*
+*    @return true se o Vendor OUI foi copiado com sucesso.
+*    @return false se a estrutura ou o buffer de saída forem inválidos.
+*/
+bool sfp_a0_get_vendor_oui(const sfp_a0h_base_t *a0,
+                           uint8_t oui_buffer[3])
+{
+    if (!a0 || !oui_buffer)
+        return false;
+
+    oui_buffer[0] = a0->vendor_oui[0];
+    oui_buffer[1] = a0->vendor_oui[1];
+    oui_buffer[2] = a0->vendor_oui[2];
+
+    return true;
+}
+
+/*
+*    Converte o Vendor OUI para um identificador de 24 bits.
+*    @param a0 Ponteiro para a estrutura sfp_a0h_base_t contendo o Vendor OUI já parseado.
+*    @return Valor inteiro de 24 bits representando o Vendor OUI. Caso a estrutura seja inválida, retorna 0.
+*/
+uint32_t sfp_vendor_oui_to_u32(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return 0;
+
+    return ((uint32_t)a0->vendor_oui[0] << 16) |
+           ((uint32_t)a0->vendor_oui[1] << 8)  |
+           ((uint32_t)a0->vendor_oui[2]);
+}
+
+
+
+
+/*
+* Getter Simples
+*/
 sfp_extended_spec_compliance_code_t sfp_a0_get_ext_compliance(const sfp_a0h_base_t *a0)
 {
     if (!a0)
@@ -666,3 +933,74 @@ bool sfp_a0_get_cc_base_is_valid(const sfp_a0h_base_t *a0)
     return a0->cc_base_is_valid;
 }
 
+/*  
+*   Realiza o parsing do Byte 2 (conector Type)
+*
+*   @param a0_base_data Ponteiro para o buffer contendo os dados lidos
+*   da EEPROM A0h (mínimo de 3 bytes válidos)
+*   @param a0 Ponteiro para a estrutura sfp_a0h_base_t onde as
+*        informações do conector serão armazenadas.
+*
+*   @return Nenhum
+*
+*   
+*/
+void sfp_parse_a0_base_connector(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    uint8_t connector_raw = a0_base_data[2];
+
+    a0->connector = (sfp_connector_type_t)connector_raw;
+}
+
+
+/*
+*    Obtém o tipo de conector do módulo SFP/SFP+.
+*    
+*    @param a0 Ponteiro para a estrutura sfp_a0h_base_t contendo os
+*    dados já parseados do módulo.
+*    @return Valor do tipo sfp_connector_type_t que identifica o
+*    conector físico do módulo, conforme SFF-8024.
+*/
+sfp_connector_type_t sfp_a0_get_connector(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return SFP_CONNECTOR_UNKNOWN;
+
+    return a0->connector;
+}
+
+/*
+*   Converte o tipo de conector SFP para uma representação textual.
+*   @param connector Valor do tipo sfp_connector_type_t que representa
+*   o tipo de conector físico do módulo.
+*
+*   @return Ponteiro para uma string constante contendo a descrição
+*   textual do conector. Caso o valor seja desconhecido ou
+*   não suportado, retorna "Unknown Connector".
+*/
+const char *sfp_connector_to_string(sfp_connector_type_t connector)
+{
+    switch (connector) {
+        case SFP_CONNECTOR_SC:              return "SC";
+        case SFP_CONNECTOR_FC_STYLE_1:      return "Fibre Channel Style 1";
+        case SFP_CONNECTOR_FC_STYLE_2:      return "Fibre Channel Style 2";
+        case SFP_CONNECTOR_BNC_TNC:          return "BNC/TNC";
+        case SFP_CONNECTOR_FC_COAX:          return "Fibre Channel Coax";
+        case SFP_CONNECTOR_FIBER_JACK:       return "Fiber Jack";
+        case SFP_CONNECTOR_LC:               return "LC";
+        case SFP_CONNECTOR_MT_RJ:            return "MT-RJ";
+        case SFP_CONNECTOR_MU:               return "MU";
+        case SFP_CONNECTOR_SG:               return "SG";
+        case SFP_CONNECTOR_OPTICAL_PIGTAIL:  return "Optical Pigtail";
+        case SFP_CONNECTOR_MPO_1X12:         return "MPO 1x12";
+        case SFP_CONNECTOR_MPO_2X16:         return "MPO 2x16";
+        case SFP_CONNECTOR_HSSDC_II:         return "HSSDC II";
+        case SFP_CONNECTOR_COPPER_PIGTAIL:   return "Copper Pigtail";
+        case SFP_CONNECTOR_RJ45:             return "RJ45";
+        case SFP_CONNECTOR_NO_SEPARABLE:     return "No Separable Connector";
+        default:                             return "Unknown Connector";
+    }
+}

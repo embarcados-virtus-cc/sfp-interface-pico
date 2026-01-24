@@ -4,6 +4,12 @@
  *
  * @author Alexandre Junior
  * @author Miguel Ryan
+ * @author Carlos Elias
+ * @author Pablo Daniel
+ * @author Pedro Lucena
+ * @author Nicholas Gomes
+ * @author Pedro Wilson
+ * @author Melquisedeque Leite
  * @date 2026-01-10
  *
  * @details
@@ -47,6 +53,9 @@
 #define SFP_A2_SIZE       256
 
 
+/* RF-02 — Byte 1 (Extended Identifier) */
+#define SFP_EXT_IDENTIFIER_EXPECTED 0x04
+
 /*==========================================
  * Byte 0 — Identifier (SFF-8472 / SFF-8024)
  ===========================================*/
@@ -58,6 +67,31 @@ typedef enum {
     SFP_ID_QSFP_PLUS = 0x11,
     SFP_ID_QSFP28    = 0x18
 } sfp_identifier_t;
+
+/* ==============================
+ * Byte 2 — Connector Types
+ * SFF-8024 Table 4-3
+ * ============================== */
+typedef enum {
+    SFP_CONNECTOR_UNKNOWN          = 0x00,
+    SFP_CONNECTOR_SC                = 0x01,
+    SFP_CONNECTOR_FC_STYLE_1        = 0x02,
+    SFP_CONNECTOR_FC_STYLE_2        = 0x03,
+    SFP_CONNECTOR_BNC_TNC           = 0x04,
+    SFP_CONNECTOR_FC_COAX           = 0x05,
+    SFP_CONNECTOR_FIBER_JACK        = 0x06,
+    SFP_CONNECTOR_LC                = 0x07,
+    SFP_CONNECTOR_MT_RJ             = 0x08,
+    SFP_CONNECTOR_MU                = 0x09,
+    SFP_CONNECTOR_SG                = 0x0A,
+    SFP_CONNECTOR_OPTICAL_PIGTAIL   = 0x0B,
+    SFP_CONNECTOR_MPO_1X12          = 0x0C,
+    SFP_CONNECTOR_MPO_2X16          = 0x0D,
+    SFP_CONNECTOR_HSSDC_II          = 0x20,
+    SFP_CONNECTOR_COPPER_PIGTAIL    = 0x21,
+    SFP_CONNECTOR_RJ45              = 0x22,
+    SFP_CONNECTOR_NO_SEPARABLE      = 0x23
+} sfp_connector_type_t;
 
 /* ==============================
  * Byte 11 — Encoding values
@@ -101,6 +135,15 @@ typedef enum {
   SFP_OM4_LEN_VALID,            /* Byte 18 = 0x01–0xFE */
   SFP_OM4_LEN_EXTENDED          /* Byte 18 = 0xFF */
 } sfp_om4_length_status_t;
+
+/*
+ * Status da informação de alcance SMF ou atenuação de cobre (Byte 14)
+ */
+typedef enum {
+  SFP_SMF_LEN_NOT_SUPPORTED,    /* Byte 14 = 0x00 */
+  SFP_SMF_LEN_VALID,            /* Byte 14 = 0x01–0xFE */
+  SFP_SMF_LEN_EXTENDED          /* Byte 14 = 0xFF */
+} sfp_smf_length_status_t;
 
 
 /**
@@ -227,6 +270,10 @@ typedef struct {
 
     /* Byte 13: Rate Identifier */
     uint8_t rate_identifier;      // Table 5-6
+
+    /* Byte 14: SMF Length or Copper Attenuation */
+    uint16_t smf_length_m;           /* Distância convertida (metros) ou atenuação (dB) */
+    sfp_smf_length_status_t smf_status;
 
     /*Byte 16: 50 um OM2*/
     uint16_t om2_length_m;           /* Distância convertida (metros) */
@@ -406,6 +453,16 @@ bool sfp_read_block(i2c_inst_t *i2c,uint8_t dev_addr,uint8_t start_offset,uint8_
 void sfp_parse_a0_base_identifier(const uint8_t *a0_base_data,sfp_a0h_base_t *a0);
 sfp_identifier_t sfp_a0_get_identifier(const sfp_a0h_base_t *a0);
 
+
+
+void sfp_parse_a0_base_ext_identifier(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
+uint8_t sfp_a0_get_ext_identifier(const sfp_a0h_base_t *a0);
+bool sfp_rf02_validate_ext_identifier(const sfp_a0h_base_t *a0);
+/* Byte 2 — Connector */
+void sfp_parse_a0_base_connector(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
+sfp_connector_type_t sfp_a0_get_connector(const sfp_a0h_base_t *a0);
+const char *sfp_connector_to_string(sfp_connector_type_t connector);
+
 /* Byte 3-10 Compliance Codes */
 void sfp_read_compliance(const uint8_t *a0_base_data, sfp_compliance_codes_t *cc);
 static void decode_byte3(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out);
@@ -429,6 +486,10 @@ void sfp_print_encoding(sfp_encoding_codes_t encoding);
 void sfp_parse_a0_base_om2(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
 uint16_t sfp_a0_get_om2_length_m(const sfp_a0h_base_t *a0, sfp_om2_length_status_t *status);
 
+/* Byte 14 SMF Length or Copper Attenuation */
+void sfp_parse_a0_base_smf(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
+uint16_t sfp_a0_get_smf_length_m(const sfp_a0h_base_t *a0, sfp_smf_length_status_t *status);
+
 /* Byte 17 OM1 (62.5 um) */
 void sfp_parse_a0_base_om1(const uint8_t *a0_base_data,sfp_a0h_base_t *a0);
 uint16_t sfp_a0_get_om1_length_m(const sfp_a0h_base_t *a0,sfp_om1_length_status_t *status);
@@ -440,6 +501,17 @@ uint16_t sfp_a0_get_om4_copper_or_length_m(const sfp_a0h_base_t *a0, sfp_om4_len
 /*Byte 36 Extended Compliance Codes) */
 void sfp_parse_a0_base_ext_compliance(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
 sfp_extended_spec_compliance_code_t sfp_a0_get_ext_compliance(const sfp_a0h_base_t *a0);
+
+/* Byte 62 — Fibre Channel Speed 2 */
+void sfp_parse_a0_fc_speed_2(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
+uint8_t sfp_a0_get_fc_speed_2(const sfp_a0h_base_t *a0);
+bool sfp_check_64gfc_support(const sfp_a0h_base_t *a0, const sfp_compliance_decoded_t *comp);
+
+/* Byte 37–39 Vendor OUI (IEEE Company Identifier) */
+void sfp_parse_a0_base_vendor_oui(const uint8_t *a0_base_data,sfp_a0h_base_t *a0);
+bool sfp_a0_get_vendor_oui(const sfp_a0h_base_t *a0, uint8_t oui_buffer[3]);
+uint32_t sfp_vendor_oui_to_u32(const sfp_a0h_base_t *a0);
+
 
 /* Byte 63 CC_BASE (Checksum) */
 void sfp_parse_a0_base_cc_base(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
