@@ -48,25 +48,20 @@ bool sfp_read_block(i2c_inst_t *i2c,uint8_t dev_addr,uint8_t start_offset,uint8_
     return (ret == length);
 }
 
-/*
- * Faz o parsing do bloco A0h.
- * Apenas o Byte 0 é tratado.
- */
-void sfp_parse_a0_base_identifier(const uint8_t *a0_base_data,sfp_a0h_base_t *a0)
+/* ============================================
+ * Byte 0 — Identifier
+ * ============================================ */
+void sfp_parse_a0_base_identifier(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
 {
     if (!a0_base_data || !a0)
         return;
 
-    /*
-     * Byte 0 — Identifier
-     * Copiado diretamente da EEPROM para a struct.
-     */
     a0->identifier = (sfp_identifier_t)a0_base_data[0];
 }
 
-/*
- * Getter simples.
- */
+/* ============================================
+ * Método Getter
+ * ============================================ */
 sfp_identifier_t sfp_a0_get_identifier(const sfp_a0h_base_t *a0)
 {
     if (!a0)
@@ -75,6 +70,107 @@ sfp_identifier_t sfp_a0_get_identifier(const sfp_a0h_base_t *a0)
     return a0->identifier;
 }
 
+/* ============================================
+ * Byte 1 — Extended Identifier
+ * ============================================ */
+void sfp_parse_a0_base_ext_identifier(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    a0->ext_identifier = a0_base_data[1];
+}
+
+/* ============================================
+ * Método Getter
+ * ============================================ */
+uint8_t sfp_a0_get_ext_identifier(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return 0x00;
+
+    return a0->ext_identifier;
+}
+
+bool sfp_validate_ext_identifier(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return false;
+
+    return (a0->ext_identifier == SFP_EXT_IDENTIFIER_EXPECTED);
+}
+
+/* ============================================
+ * Byte 2 — Connector
+ * ============================================ */
+void sfp_parse_a0_base_connector(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    uint8_t connector_raw = a0_base_data[2];
+    a0->connector = (sfp_connector_type_t)connector_raw;
+}
+
+/* ============================================
+ * Método Getter
+ * ============================================ */
+sfp_connector_type_t sfp_a0_get_connector(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return SFP_CONNECTOR_UNKNOWN;
+
+    return a0->connector;
+}
+
+/* ============================================
+ * Método de Exposição
+ * ============================================ */
+const char *sfp_connector_to_string(sfp_connector_type_t connector)
+{
+    switch (connector) {
+        case SFP_CONNECTOR_SC:
+            return "SC";
+        case SFP_CONNECTOR_FC_STYLE_1:
+            return "Fibre Channel Style 1";
+        case SFP_CONNECTOR_FC_STYLE_2:
+            return "Fibre Channel Style 2";
+        case SFP_CONNECTOR_BNC_TNC:
+            return "BNC/TNC";
+        case SFP_CONNECTOR_FC_COAX:
+            return "Fibre Channel Coax";
+        case SFP_CONNECTOR_FIBER_JACK:
+            return "Fiber Jack";
+        case SFP_CONNECTOR_LC:
+            return "LC";
+        case SFP_CONNECTOR_MT_RJ:
+            return "MT-RJ";
+        case SFP_CONNECTOR_MU:
+            return "MU";
+        case SFP_CONNECTOR_SG:
+            return "SG";
+        case SFP_CONNECTOR_OPTICAL_PIGTAIL:
+            return "Optical Pigtail";
+        case SFP_CONNECTOR_MPO_1X12:
+            return "MPO 1x12";
+        case SFP_CONNECTOR_MPO_2X16:
+            return "MPO 2x16";
+        case SFP_CONNECTOR_HSSDC_II:
+            return "HSSDC II";
+        case SFP_CONNECTOR_COPPER_PIGTAIL:
+            return "Copper Pigtail";
+        case SFP_CONNECTOR_RJ45:
+            return "RJ45";
+        case SFP_CONNECTOR_NO_SEPARABLE:
+            return "No Separable Connector";
+        default:
+            return "Unknown Connector";
+    }
+}
+
+/* ============================================
+ * Bytes 3-10 — Compliance Codes
+ * ============================================ */
 void sfp_read_compliance(const uint8_t *a0_base_data, sfp_compliance_codes_t *cc)
 {
     if (!a0_base_data || !cc)
@@ -90,132 +186,138 @@ void sfp_read_compliance(const uint8_t *a0_base_data, sfp_compliance_codes_t *cc
     cc->byte10 = a0_base_data[10];
 }
 
+/* ============================================
+ * Decode do Byte 3
+ * ============================================ */
 static void decode_byte3(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out)
 {
     uint8_t b = cc->byte3;
-
-    /* 10G Ethernet Compliance Codes */
-    out->eth_10g_base_er               = b & (1 << 7);
-    out->eth_10g_base_lrm              = b & (1 << 6);
-    out->eth_10g_base_lr               = b & (1 << 5);
-    out->eth_10g_base_sr               = b & (1 << 4);
-    /* InfiniBand Compliance Codes */
-    out->infiniband_1x_sx              = b & (1 << 3);
-    out->infiniband_1x_lx              = b & (1 << 2);
-    out->infiniband_1x_copper_active   = b & (1 << 1);
-    out->infiniband_1x_copper_passive  = b & (1 << 0);
+    out->eth_10g_base_er               = (b & (1 << 7)) != 0;
+    out->eth_10g_base_lrm              = (b & (1 << 6)) != 0;
+    out->eth_10g_base_lr               = (b & (1 << 5)) != 0;
+    out->eth_10g_base_sr               = (b & (1 << 4)) != 0;
+    out->infiniband_1x_sx              = (b & (1 << 3)) != 0;
+    out->infiniband_1x_lx              = (b & (1 << 2)) != 0;
+    out->infiniband_1x_copper_active   = (b & (1 << 1)) != 0;
+    out->infiniband_1x_copper_passive  = (b & (1 << 0)) != 0;
 }
 
+/* ============================================
+ * Decode do Byte 4
+ * ============================================ */
 static void decode_byte4(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out)
 {
     uint8_t b = cc->byte4;
-
-    /* Escon Compliance Codes */
-    out->escon_mmf  = b & (1 << 7);
-    out->escon_smf  = b & (1 << 6);
-    /* Sonet Compliance Codes */
-    out->oc_192_sr  = b & (1 << 5);
-    out->sonet_rs_1 = b & (1 << 4);
-    out->sonet_rs_2 = b & (1 << 3);
-    out->oc_48_lr   = b & (1 << 2);
-    out->oc_48_ir   = b & (1 << 1);
-    out->oc_48_sr   = b & (1 << 0);
+    out->escon_mmf  = (b & (1 << 7)) != 0;
+    out->escon_smf  = (b & (1 << 6)) != 0;
+    out->oc_192_sr  = (b & (1 << 5)) != 0;
+    out->sonet_rs_1 = (b & (1 << 4)) != 0;
+    out->sonet_rs_2 = (b & (1 << 3)) != 0;
+    out->oc_48_lr   = (b & (1 << 2)) != 0;
+    out->oc_48_ir   = (b & (1 << 1)) != 0;
+    out->oc_48_sr   = (b & (1 << 0)) != 0;
 }
 
+/* ============================================
+ * Decode do Byte 5
+ * ============================================ */
 static void decode_byte5(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out)
 {
     uint8_t b = cc->byte5;
-
-    /* Sonet Compliance Codes */
-    out->oc_12_sm_lr = b & (1 << 6);
-    out->oc_12_sm_ir = b & (1 << 5);
-    out->oc_12_sr    = b & (1 << 4);
-    out->oc_3_sm_lr  = b & (1 << 2);
-    out->oc_3_sm_ir  = b & (1 << 1);
-    out->oc_3_sr     = b & (1 << 0);
+    out->oc_12_sm_lr = (b & (1 << 6)) != 0;
+    out->oc_12_sm_ir = (b & (1 << 5)) != 0;
+    out->oc_12_sr    = (b & (1 << 4)) != 0;
+    out->oc_3_sm_lr  = (b & (1 << 2)) != 0;
+    out->oc_3_sm_ir  = (b & (1 << 1)) != 0;
+    out->oc_3_sr     = (b & (1 << 0)) != 0;
 }
 
+/* ============================================
+ * Decode do Byte 6
+ * ============================================ */
 static void decode_byte6(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out)
 {
     uint8_t b = cc->byte6;
-
-    /* Ethernet Compliance Codes */
-    out->eth_base_px      = b & (1 << 7);
-    out->eth_base_bx_10   = b & (1 << 6);
-    out->eth_100_base_fx  = b & (1 << 5);
-    out->eth_100_base_lx  = b & (1 << 4);
-    out->eth_1000_base_t  = b & (1 << 3);
-    out->eth_1000_base_cx = b & (1 << 2);
-    out->eth_1000_base_lx = b & (1 << 1);
-    out->eth_1000_base_sx = b & (1 << 0);
+    out->eth_base_px      = (b & (1 << 7)) != 0;
+    out->eth_base_bx_10   = (b & (1 << 6)) != 0;
+    out->eth_100_base_fx  = (b & (1 << 5)) != 0;
+    out->eth_100_base_lx  = (b & (1 << 4)) != 0;
+    out->eth_1000_base_t  = (b & (1 << 3)) != 0;
+    out->eth_1000_base_cx = (b & (1 << 2)) != 0;
+    out->eth_1000_base_lx = (b & (1 << 1)) != 0;
+    out->eth_1000_base_sx = (b & (1 << 0)) != 0;
 }
 
+/* ============================================
+ * Decode do Byte 7
+ * ============================================ */
 static void decode_byte7(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out)
 {
     uint8_t b = cc->byte7;
-
-    /* Fibre Channel Link Length */
-    out->fc_very_long_distance      = b & (1 << 7);
-    out->fc_short_distance          = b & (1 << 6);
-    out->fc_intermediate_distance   = b & (1 << 5);
-    out->fc_long_distance           = b & (1 << 4);
-    out->fc_medium_distance         = b & (1 << 3);
-    /* Fibre Channel Tecnology */
-    out->shortwave_laser_sa         = b & (1 << 2);
-    out->longwave_laser_lc          = b & (1 << 1);
-    out->electrical_inter_enclosure = b & (1 << 0);
+    out->fc_very_long_distance      = (b & (1 << 7)) != 0;
+    out->fc_short_distance          = (b & (1 << 6)) != 0;
+    out->fc_intermediate_distance   = (b & (1 << 5)) != 0;
+    out->fc_long_distance           = (b & (1 << 4)) != 0;
+    out->fc_medium_distance         = (b & (1 << 3)) != 0;
+    out->shortwave_laser_sa         = (b & (1 << 2)) != 0;
+    out->longwave_laser_lc          = (b & (1 << 1)) != 0;
+    out->electrical_inter_enclosure = (b & (1 << 0)) != 0;
 }
 
+/* ============================================
+ * Decode do Byte 8
+ * ============================================ */
 static void decode_byte8(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out)
 {
     uint8_t b = cc->byte8;
-
-    /* Fibre Channel Tecnology */
-    out->electrical_intra_enclosure = b & (1 << 7);
-    out->shortwave_laser_sn         = b & (1 << 6);
-    out->shortwave_laser_sl         = b & (1 << 5);
-    out->longwave_laser_ll          = b & (1 << 4);
-    /* SFP+ Cable Technology */
-    out->active_cable               = b & (1 << 3);
-    out->passive_cable              = b & (1 << 2);
+    out->electrical_intra_enclosure = (b & (1 << 7)) != 0;
+    out->shortwave_laser_sn         = (b & (1 << 6)) != 0;
+    out->shortwave_laser_sl        = (b & (1 << 5)) != 0;
+    out->longwave_laser_ll          = (b & (1 << 4)) != 0;
+    out->active_cable               = (b & (1 << 3)) != 0;
+    out->passive_cable              = (b & (1 << 2)) != 0;
 }
 
+/* ============================================
+ * Decode do Byte 9
+ * ============================================ */
 static void decode_byte9(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out)
 {
     uint8_t b = cc->byte9;
-
-    /* Fibre Channel Transmission Media */
-    out->twin_axial_pair = b & (1 << 7);
-    out->twisted_pair    = b & (1 << 6);
-    out->miniature_coax  = b & (1 << 5);
-    out->video_coax      = b & (1 << 4);
-    out->multimode_m6    = b & (1 << 3);
-    out->multimode_m5    = b & (1 << 2);
-    out->single_mode     = b & (1 << 0);
+    out->twin_axial_pair = (b & (1 << 7)) != 0;
+    out->twisted_pair    = (b & (1 << 6)) != 0;
+    out->miniature_coax  = (b & (1 << 5)) != 0;
+    out->video_coax      = (b & (1 << 4)) != 0;
+    out->multimode_m6    = (b & (1 << 3)) != 0;
+    out->multimode_m5    = (b & (1 << 2)) != 0;
+    out->single_mode     = (b & (1 << 0)) != 0;
 }
 
+/* ============================================
+ * Decode do Byte 10
+ * ============================================ */
 static void decode_byte10(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out)
 {
     uint8_t b = cc->byte10;
-
-    /* Fibre Channel Speed */
-    out->cs_1200_mbps = b & (1 << 7);
-    out->cs_800_mbps  = b & (1 << 6);
-    out->cs_1600_mbps = b & (1 << 5);
-    out->cs_400_mbps  = b & (1 << 4);
-    out->cs_3200_mbps = b & (1 << 3);
-    out->cs_200_mbps  = b & (1 << 2);
-    out->see_byte_62  = b & (1 << 1);
-    out->cs_100_mbps  = b & (1 << 0);
+    out->cs_1200_mbps = (b & (1 << 7)) != 0;
+    out->cs_800_mbps  = (b & (1 << 6)) != 0;
+    out->cs_1600_mbps = (b & (1 << 5)) != 0;
+    out->cs_400_mbps  = (b & (1 << 4)) != 0;
+    out->cs_3200_mbps = (b & (1 << 3)) != 0;
+    out->cs_200_mbps  = (b & (1 << 2)) != 0;
+    out->see_byte_62  = (b & (1 << 1)) != 0;
+    out->cs_100_mbps  = (b & (1 << 0)) != 0;
 }
 
+/* ============================================
+ * Método principal para decodificação de todos os bytes
+ * ============================================ */
 void sfp_decode_compliance(const sfp_compliance_codes_t *cc, sfp_compliance_decoded_t *out)
 {
     if (!cc || !out)
         return;
 
     memset(out, 0, sizeof(*out));
-
     decode_byte3(cc, out);
     decode_byte4(cc, out);
     decode_byte5(cc, out);
@@ -226,6 +328,9 @@ void sfp_decode_compliance(const sfp_compliance_codes_t *cc, sfp_compliance_deco
     decode_byte10(cc, out);
 }
 
+/* ============================================
+ * Método de Exposição
+ * ============================================ */
 void sfp_print_compliance(const sfp_compliance_decoded_t *c)
 {
     if (!c) return;
@@ -332,22 +437,37 @@ void sfp_print_compliance(const sfp_compliance_decoded_t *c)
     if (c->cs_100_mbps)  printf("  - 100 Mbps\n");
 }
 
+/* =========================================================
+ * Byte 8 — Natureza física do meio
+ * =========================================================*/
+static bool sfp_is_copper(uint8_t byte8)
+{
+    return ((byte8 & (1 << 2)) != 0) || ((byte8 & (1 << 3)) != 0);
+}
+
+/* ============================================
+ * Byte 11 — Encoding
+ * ============================================ */
 void sfp_parse_a0_base_encoding(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
 {
     if (!a0_base_data || !a0)
         return;
-
     a0->encoding = (sfp_encoding_codes_t)a0_base_data[11];
 }
 
+/* ============================================
+ * Método Getter
+ * ============================================ */
 sfp_encoding_codes_t sfp_a0_get_encoding(const sfp_a0h_base_t *a0)
 {
     if (!a0)
         return SFP_ENC_UNSPECIFIED;
-
     return a0->encoding;
 }
 
+/* ============================================
+ * Método de Exposição
+ * ============================================ */
 void sfp_print_encoding(sfp_encoding_codes_t encoding)
 {
     printf("\n[Byte 11] Encoding:\n");
@@ -386,17 +506,96 @@ void sfp_print_encoding(sfp_encoding_codes_t encoding)
     }
 }
 
-/*
- * Parsing do Byte 16 (OM2, 50 µm)
- */
+/* =========================================================
+ * Byte 14 — Length (SMF) or Attenuation (Copper)
+ *
+ * @details
+ *  - Para fibra SMF: Representa o alcance em quilômetros (km)
+ *    Unidade: 1 km (valor 0x01 = 1 km, 0x64 = 100 km)
+ *
+ *  - Para cabo de cobre: Representa a atenuação em dB/100m
+ *    Unidade: 0.5 dB/100m (valor 0x01 = 0.5 dB/100m)
+ *
+ *  - Valores especiais:
+ *    0x00: Não suportado ou informação não disponível
+ *    0xFF: Valor superior ao máximo representável (> 254 km ou > 127 dB/100m)
+ * =========================================================*/
+
+void sfp_parse_a0_base_smf(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    uint8_t raw = a0_base_data[14];
+
+    uint8_t byte8 = a0_base_data[8];
+
+    bool is_copper = sfp_is_copper(byte8);
+
+    /*
+     * Fluxo Principal + Secundários
+     */
+    if (raw == 0x00) {
+        /*
+         * Fluxo Secundário 2 (caso 00h):
+         * Não há informação explícita de alcance SMF ou atenuação de cobre.
+         */
+        a0->smf_status   = SFP_SMF_LEN_NOT_SUPPORTED;
+        a0->smf_length_m = 0;
+    }
+    else if (raw == 0xFF) {
+        /*
+         * Fluxo Secundário (caso FFh):
+         * Comprimento/Atenuação superior ao máximo nominal representável.
+         *
+         * - Fibra SMF: alcance > 254 km
+         * - Cabo de cobre: atenuação > 127 dB/100m
+         *
+         * O valor armazenado representa o limite inferior/superior conhecido.
+         */
+        a0->smf_status   = SFP_SMF_LEN_EXTENDED;
+
+        if (is_copper)
+            a0->smf_length_m = 254; /* 254 * 0.5 = 127 dB/100m */
+        else
+            a0->smf_length_m = 254; /* 254 km */
+    }
+    else {
+        /*
+         * Fluxo Principal:
+         * Valor válido (01h–FEh)
+         *
+         * - Fibra SMF: unidade de 1 km (valor direto)
+         * - Cabo de cobre: unidade de 0.5 dB/100m (valor * 0.5)
+         */
+        a0->smf_status   = SFP_SMF_LEN_VALID;
+        a0->smf_length_m = (uint16_t)raw;
+    }
+}
+
+/* ============================================
+ * Método Getter
+ * ============================================ */
+uint16_t sfp_a0_get_smf_length_m(const sfp_a0h_base_t *a0, sfp_smf_length_status_t *status)
+{
+    if (!a0) {
+        if (status)
+            *status = SFP_SMF_LEN_NOT_SUPPORTED;
+        return 0;
+    }
+    if (status)
+        *status = a0->smf_status;
+    return a0->smf_length_m;
+}
+
+/* ============================================
+ * Byte 16 — OM2 Length (50 µm)
+ * ============================================ */
 void sfp_parse_a0_base_om2(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
 {
     if (!a0_base_data || !a0)
         return;
 
-    /* =========================================================
-     * Byte 16 — Length (OM2, 50 µm)
-     * =========================================================*/
     uint8_t raw = a0_base_data[16];
 
     /*
@@ -429,9 +628,9 @@ void sfp_parse_a0_base_om2(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
     }
 }
 
-/*
- * Getter simples para OM2
- */
+/* ============================================
+ * Método Getter
+ * ============================================ */
 uint16_t sfp_a0_get_om2_length_m(const sfp_a0h_base_t *a0, sfp_om2_length_status_t *status)
 {
     if (!a0) {
@@ -439,21 +638,19 @@ uint16_t sfp_a0_get_om2_length_m(const sfp_a0h_base_t *a0, sfp_om2_length_status
             *status = SFP_OM2_LEN_NOT_SUPPORTED;
         return 0;
     }
-
     if (status)
         *status = a0->om2_status;
-
     return a0->om2_length_m;
 }
 
-void sfp_parse_a0_base_om1(const uint8_t *a0_base_data,sfp_a0h_base_t *a0)
+/* ============================================
+ * Byte 17 — OM1 Length (62.5 µm)
+ * ============================================ */
+void sfp_parse_a0_base_om1(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
 {
     if (!a0_base_data || !a0)
         return;
 
-    /* =========================================================
-     * Byte 17 — Length (OM1, 62.5 µm)
-     * =========================================================*/
     uint8_t raw = a0_base_data[17];
 
     /*
@@ -488,44 +685,31 @@ void sfp_parse_a0_base_om1(const uint8_t *a0_base_data,sfp_a0h_base_t *a0)
     }
 }
 
-/*
- * Getter simples.
- */
-
-uint16_t sfp_a0_get_om1_length_m(const sfp_a0h_base_t *a0,sfp_om1_length_status_t *status)
+/* ============================================
+ * Método Getter
+ * ============================================ */
+uint16_t sfp_a0_get_om1_length_m(const sfp_a0h_base_t *a0, sfp_om1_length_status_t *status)
 {
     if (!a0) {
         if (status)
             *status = SFP_OM1_LEN_NOT_SUPPORTED;
         return 0;
     }
-
     if (status)
         *status = a0->om1_status;
-
     return a0->om1_length_m;
 }
 
-
-/* Função auxiliar para saber se é um cabo de cobre ou não */
-static bool sfp_is_copper(uint8_t byte8)
-{
-    /* Se é um cabo de cobre, o bit 2 ou 3 está ativo. */
-    return (byte8 & (1 << 2)) || (byte8 & (1 << 3));
-}
-
+/* ============================================
+ * Byte 18 — OM4 or Copper Cable Length
+ * ============================================ */
 void sfp_parse_a0_base_om4_or_copper(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
 {
     if (!a0_base_data || !a0)
         return;
 
-    /* =========================================================
-     * Byte 18 — Length (OM4 or copper cable)
-     * =========================================================*/
     uint8_t raw_length = a0_base_data[18];
-    /* =========================================================
-     * Byte 8 — Natureza física do meio
-     * =========================================================*/
+
     uint8_t byte8 = a0_base_data[8];
 
     bool is_copper = sfp_is_copper(byte8);
@@ -538,8 +722,8 @@ void sfp_parse_a0_base_om4_or_copper(const uint8_t *a0_base_data, sfp_a0h_base_t
          * Fluxo Secundário 2 (caso 00h):
          * Não há informação explícita de comprimento de OM4 ou o cobre sem informação válida.
          */
-        a0->om4_or_cooper_status = SFP_OM4_LEN_NOT_SUPPORTED;
-        a0->om4_or_cooper_length_m = 0;
+        a0->om4_or_copper_status = SFP_OM4_LEN_NOT_SUPPORTED;
+        a0->om4_or_copper_length_m = 0;
     }
     else if (raw_length == 0xFF) {
         /*
@@ -552,12 +736,12 @@ void sfp_parse_a0_base_om4_or_copper(const uint8_t *a0_base_data, sfp_a0h_base_t
          *
          * O valor armazenado representa o limite inferior conhecido.
          */
-        a0->om4_or_cooper_status = SFP_OM4_LEN_EXTENDED;
+        a0->om4_or_copper_status = SFP_OM4_LEN_EXTENDED;
 
         if (is_copper)
-            a0->om4_or_cooper_length_m = 254;
+            a0->om4_or_copper_length_m = 254;
         else
-            a0->om4_or_cooper_length_m = 2540;
+            a0->om4_or_copper_length_m = 2540;
     }
     else {
         /*
@@ -567,149 +751,154 @@ void sfp_parse_a0_base_om4_or_copper(const uint8_t *a0_base_data, sfp_a0h_base_t
          * - OM4: unidades de 10 metros
          * - Cabo de cobre: unidades de 1 metro
          */
-        a0->om4_or_cooper_status = SFP_OM4_LEN_VALID;
+        a0->om4_or_copper_status = SFP_OM4_LEN_VALID;
 
         if (is_copper)
-            a0->om4_or_cooper_length_m = raw_length;
+            a0->om4_or_copper_length_m = raw_length;
         else
-            a0->om4_or_cooper_length_m = (uint16_t)raw_length * 10;
+            a0->om4_or_copper_length_m = (uint16_t)raw_length * 10;
     }
 }
 
-/*
- * Getter simples.
- */
-
+/* ============================================
+ * Método Getter
+ * ============================================ */
 uint16_t sfp_a0_get_om4_copper_or_length_m(const sfp_a0h_base_t *a0, sfp_om4_length_status_t *status)
 {
     if (!a0) {
-        if (!status) {
+        if (status)
             *status = SFP_OM4_LEN_NOT_SUPPORTED;
-        }
         return 0;
     }
-
     if (status)
-        *status = a0->om4_or_cooper_status;
-
-    return a0->om4_or_cooper_length_m;
+        *status = a0->om4_or_copper_status;
+    return a0->om4_or_copper_length_m;
 }
 
-static bool sfp__is_printable_ascii(uint8_t c)
-{
-    /* ASCII imprimível padrão (inclui espaço) */
-    return (c >= 0x20u) && (c <= 0x7Eu);
-}
-
-static bool sfp_a0_vendor_name_is_valid(const sfp_a0h_base_t *a0)
-{
-    if (!a0)
-        return false;
-
-    bool found_padding = false;
-    bool has_content = false;
-
-    /* Todos os bytes devem ser ASCII imprimível */
-    for (size_t i = 0; i < SFP_A0_LEN_VENDOR_NAME; i++) {
-        uint8_t c = (uint8_t)a0->vendor_name[i];
-        if (!sfp__is_printable_ascii(c))
-            return false;
-
-        if (c == 0x20u) {
-            found_padding = true;
-            continue;
-        }
-
-        if (found_padding)
-            return false;
-
-        has_content = true;
-    }
-
-    /* Não pode ser vazio (todos espaços) */
-    return has_content;
-}
-
-void sfp_parse_a0_base_vendor_name(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
-{
-    if (!a0_base_data || !a0)
-        return;
-
-    /* Vendor Name (16 bytes) - ASCII, alinhado a esquerda, padding com 0x20 */
-    memcpy(a0->vendor_name, &a0_base_data[SFP_A0_BYTE_VENDOR_NAME], SFP_A0_LEN_VENDOR_NAME);
-    a0->is_valid_vendor_name = sfp_a0_vendor_name_is_valid(a0);
-}
-
-
-
-/*
- * Faz o parsing do byte 36 (Extended Compliance Codes)
- * conforme SFF-8024 Table 4-4
- */
+/* ============================================
+ * Byte 36 — Extended Compliance Codes (SFF-8024 Table 4-4)
+ * ============================================ */
 void sfp_parse_a0_base_ext_compliance(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
 {
     if (!a0_base_data || !a0)
         return;
-
     a0->ext_compliance = (sfp_extended_spec_compliance_code_t)a0_base_data[36];
 }
 
-/*
-* Getter Simples
-*/
-
+/* ============================================
+ * Método Getter
+ * ============================================ */
 sfp_extended_spec_compliance_code_t sfp_a0_get_ext_compliance(const sfp_a0h_base_t *a0)
 {
     if (!a0)
         return EXT_SPEC_COMPLIANCE_UNSPECIFIED;
-
     return a0->ext_compliance;
 }
 
-/*
- * Faz a validação do checksum CC_BASE (Byte 63).
- * 
- * O checksum é calculado como a soma dos bytes 0 a 62 (inclusive) mais o byte 63
- * deve resultar em 0 (ou seja, a soma de todos os bytes 0 a 63 deve ser 0 mod 256).
- * 
- * @param a0_base_data Ponteiro para o array de dados A0h (64 bytes)
- * @param a0 Ponteiro para a estrutura sfp_a0h_base_t onde o resultado será armazenado
- */
+/* ============================================
+ * Byte 37-39 — Vendor OUI
+ * ============================================ */
+void sfp_parse_a0_base_vendor_oui(const uint8_t *a0_base_data,
+                                  sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    /* Bytes 37–39: Vendor OUI (IEEE Company Identifier) */
+    a0->vendor_oui[0] = a0_base_data[37];
+    a0->vendor_oui[1] = a0_base_data[38];
+    a0->vendor_oui[2] = a0_base_data[39];
+}
+
+/* ============================================
+ * Método Getter
+ * ============================================ */
+bool sfp_a0_get_vendor_oui(const sfp_a0h_base_t *a0,
+                           uint8_t oui_buffer[3])
+{
+    if (!a0 || !oui_buffer)
+        return false;
+
+    oui_buffer[0] = a0->vendor_oui[0];
+    oui_buffer[1] = a0->vendor_oui[1];
+    oui_buffer[2] = a0->vendor_oui[2];
+
+    return true;
+}
+
+/* ============================================
+*    Converte o Vendor OUI para um identificador de 24 bits.
+*    @param a0 Ponteiro para a estrutura sfp_a0h_base_t contendo o Vendor OUI já parseado.
+*    @return Valor inteiro de 24 bits representando o Vendor OUI. Caso a estrutura seja inválida, retorna 0.
+* ============================================ */
+uint32_t sfp_vendor_oui_to_u32(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return 0;
+
+    return ((uint32_t)a0->vendor_oui[0] << 16) |
+           ((uint32_t)a0->vendor_oui[1] << 8)  |
+           ((uint32_t)a0->vendor_oui[2]);
+}
+
+/* ============================================
+ * Byte 62 — Fibre Channel Speed 2
+ * ============================================ */
+void sfp_parse_a0_fc_speed_2(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    a0->fc_speed2 = a0_base_data[62];
+}
+
+/* ============================================
+ * Método Getter
+ * ============================================ */
+bool sfp_get_a0_fc_speed_2(const sfp_a0h_base_t *a0, const sfp_compliance_decoded_t *comp)
+{
+    uint8_t b = a0->fc_speed2;
+
+    if (!a0 || !comp)
+        return false;
+
+    if (!comp->see_byte_62) {
+        return false;
+    }
+
+    uint8_t speed = b & (1 << 0);
+
+    return speed;
+}
+
+/* ============================================
+ * Byte 63 — CC_BASE Checksum
+ * ============================================ */
 void sfp_parse_a0_base_cc_base(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
 {
     if (!a0_base_data || !a0)
         return;
 
-    /* Calcula a soma dos bytes 0 a 62 */
     uint16_t sum = 0;
     for (int i = 0; i < 63; i++) {
         sum += a0_base_data[i];
     }
 
-    /* Converte para 8 bits (modulo 256) */
     uint8_t sum_mod256 = (uint8_t)(sum & 0xFF);
 
-    /* Adiciona o byte 63 (CC_BASE) */
     uint8_t checksum_byte = a0_base_data[63];
 
-    /* Verifica se a soma total é  igual ao checksum*/
-   a0->cc_base_is_valid = (sum_mod256 == checksum_byte);
+    a0->cc_base_is_valid = (sum_mod256 == checksum_byte);
 
-    /* Armazena o byte do checksum para referência */
     a0->cc_base = checksum_byte;
 }
 
-/*
- * Retorna o status de validação do checksum CC_BASE.
- * 
- * @param a0 Ponteiro para a estrutura sfp_a0h_base_t
- * @return true se o checksum é válido, false caso contrário
- */
+/* ============================================
+ * Método Getter
+ * ============================================ */
 bool sfp_a0_get_cc_base_is_valid(const sfp_a0h_base_t *a0)
 {
     if (!a0)
         return false;
-
     return a0->cc_base_is_valid;
 }
-
