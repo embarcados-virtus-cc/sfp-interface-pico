@@ -954,23 +954,21 @@ void sfp_parse_a0_base_vendor_pn(const uint8_t *a0_base_data, sfp_a0h_base_t *a0
     if (!a0_base_data || !a0)
         return;
 
-    mencpy (a0->vendor_pn, &a0_base_data[16], 16);
-    a0->
+    mencpy (a0->vendor_pn, &a0_base_data[40], 16);
+
 }
 
-/* ============================================
- * * Obtém o Vendor Part Number como string
- * 
- * @param a0 Ponteiro para a estrutura sfp_a0h_base_t
- * @return Ponteiro para o Vendor Part Number (string terminada em null). Caso a estrutura seja inválida, retorna 0.
- *
- * ============================================ */
-const char* sfp_a0_get_vendor_pn(const sfp_a0h_base_t *a0)
+bool sfp_a0_get_vendor_pn(const sfp_a0h_base_t *a0, const char *vendor_pn)
 {
-    if (!a0)
-        return 0;
+    if (!a0){
+        if (vendor_pn)
+            *vendor_pn = NULL;
+        return false;
+    }
 
-    return a0->vendor_pn;
+    if (vendor_pn){
+        *vendor_pn = a0->vendor_pn;
+    }
 }
 
 /* ============================================
