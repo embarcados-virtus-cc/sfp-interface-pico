@@ -947,6 +947,33 @@ uint32_t sfp_vendor_oui_to_u32(const sfp_a0h_base_t *a0)
 }
 
 /* ============================================
+ * Byte 40-55 — Vendor PN (Part Number)
+ * ============================================ */
+void sfp_parse_a0_base_vendor_pn(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_data || !a0)
+        return;
+
+    mencpy (a0->vendor_pn, &a0_base_data[16], 16);
+    a0->
+}
+
+/* ============================================
+ * * Obtém o Vendor Part Number como string
+ * 
+ * @param a0 Ponteiro para a estrutura sfp_a0h_base_t
+ * @return Ponteiro para o Vendor Part Number (string terminada em null). Caso a estrutura seja inválida, retorna 0.
+ *
+ * ============================================ */
+const char* sfp_a0_get_vendor_pn(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return 0;
+
+    return a0->vendor_pn;
+}
+
+/* ============================================
  * Byte 62 — Fibre Channel Speed 2
  * ============================================ */
 void sfp_parse_a0_fc_speed_2(const uint8_t *a0_base_data, sfp_a0h_base_t *a0)
