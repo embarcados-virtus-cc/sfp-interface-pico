@@ -489,6 +489,10 @@ bool sfp_a0_get_vendor_name(const sfp_a0h_base_t *a0, const char *vendor_name)
 void sfp_parse_a0_base_ext_compliance(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
 sfp_extended_spec_compliance_code_t sfp_a0_get_ext_compliance(const sfp_a0h_base_t *a0);
 
+/*Byte 40-55 Vendor PN (Part Number)*/
+void sfp_perse_a0_base_vendor_pn(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
+bool sfp_a0_get_vendor_pn(const sfp_a0h_base_t *a0, const char *vendor_pn);
+
 /* Byte 63 CC_BASE (Checksum) */
 void sfp_parse_a0_base_cc_base(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
 bool sfp_a0_get_cc_base_is_valid(const sfp_a0h_base_t *a0);
