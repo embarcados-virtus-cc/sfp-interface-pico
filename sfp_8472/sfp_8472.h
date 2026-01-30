@@ -444,7 +444,7 @@ typedef struct {
     sfp_nominal_rate_status_t nominal_rate_status;         // Units of 100 MBd
 
     /* Byte 13: Rate Identifier */
-    uint8_t rate_identifier;      // Table 5-6
+    sfp_rate_select rate_select;      // Table 5-6
 
     /*Byte 16: 50 um OM2*/
     uint16_t om2_length_m;           /* Distância convertida (metros) */
@@ -546,7 +546,7 @@ uint8_t sfp_a0_get_nominal_rate_mbd(const sfp_a0h_base_t *a0, sfp_nominal_rate_s
 
 /*Byte 13: Rate Identifier*/
 void sfp_parse_a0_base_rate_identifier(const uint8_t *a0_base_date, sfp_a0h_base_t *a0);
-uint8_t sfp_a0_get_rate_identifier(const sfp_a0h_base_t *a0);
+sfp_rate_select sfp_a0_get_rate_identifier(const sfp_a0h_base_t *a0);
 
 /* Byte 16 OM2 Length Status (50 um)*/
 void sfp_parse_a0_base_om2(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
