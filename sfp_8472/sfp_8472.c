@@ -542,6 +542,29 @@ uint8_t sfp_a0_get_nominal_rate_mbd(const sfp_a0h_base_t *a0, sfp_nominal_rate_s
         *status = a0->nominal_rate_status;
     return a0->nominal_rate;
 }
+
+/* ============================================
+ * Byte 13 — Rate Identifier 
+ * ============================================ */
+void sfp_parse_a0_base_rate_identifier(const uint8_t *a0_base_date, sfp_a0h_base_t *a0)
+{
+    if (!a0_base_date || !a0)
+        return;
+    
+    a0->rate_identifier = (sfp_rate_select) a0_base_date[13];
+}
+
+/* ============================================
+ * Método Getter
+ * ============================================ */
+sfp_rate_select sfp_a0_get_rate_identifier(const sfp_a0h_base_t *a0)
+{
+    if (!a0)
+        return 0;
+    
+    return a0->rate_identifier;
+}
+
 /* =========================================================
  * Byte 14 — Length (SMF) or Attenuation (Copper)
  *

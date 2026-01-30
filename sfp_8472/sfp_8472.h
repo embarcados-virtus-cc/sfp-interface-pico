@@ -344,6 +344,81 @@ typedef struct {
 } sfp_compliance_decoded_t;
 
 /**********************************************
+ * Byte 13: Rate Identifier 
+ **********************************************
+
+ * Enumeração para os valores do byte 13 do endereço A0h (Rate Select)
+ * Referência: SFF-8472 (Diagnostic Monitoring Interface for Optical Transceivers)
+ **********************************************/
+typedef enum {
+    // 0x00: Não especificado
+    RS_UNSPECIFIED_00 = 0x00,
+    
+    // 0x01: SFF-8079 (4/2/1G Rate_Select & AS0/AS1)
+    RS_SFF_8079 = 0x01,
+    
+    // 0x02: SFF-8431 (8/4/2G Rx Rate_Select only)
+    RS_SFF_8431_RX_ONLY = 0x02,
+    
+    // 0x03: Não especificado
+    RS_UNSPECIFIED_03 = 0x03,
+    
+    // 0x04: SFF-8431 (8/4/2G Tx Rate_Select only)
+    RS_SFF_8431_TX_ONLY = 0x04,
+    
+    // 0x05: Não especificado
+    RS_UNSPECIFIED_05 = 0x05,
+    
+    // 0x06: SFF-8431 (8/4/2G Independent Rx & Tx Rate_select)
+    RS_SFF_8431_INDEPENDENT_RX_TX = 0x06,
+    
+    // 0x07: Não especificado
+    RS_UNSPECIFIED_07 = 0x07,
+    
+    // 0x08: FC-PI-5 (16/8/4G Rx Rate_select only) High=16G only, Low=8G/4G
+    RS_FC_PI_5_RX_ONLY = 0x08,
+    
+    // 0x09: Não especificado
+    RS_UNSPECIFIED_09 = 0x09,
+    
+    // 0x0A: FC-PI-5 (16/8/4G Independent Rx, Tx Rate_select) High=16G only, Low=8G/4G
+    RS_FC_PI_5_INDEPENDENT_RX_TX = 0x0A,
+    
+    // 0x0B: Não especificado
+    RS_UNSPECIFIED_0B = 0x0B,
+    
+    // 0x0C: FC-PI-6 (32/16/8G Independent Rx, Tx Rate_select) High=32G only, Low=16G/8G
+    RS_FC_PI_6_INDEPENDENT_RX_TX = 0x0C,
+    
+    // 0x0D: Não especificado
+    RS_UNSPECIFIED_0D = 0x0D,
+    
+    // 0x0E: 10/8G Rx and Tx Rate_Select controlando operação ou modos de bloqueio
+    RS_10G_8G_RX_TX_RATE_SELECT = 0x0E,
+    
+    // 0x0F: Não especificado
+    RS_UNSPECIFIED_0F = 0x0F,
+    
+    // 0x10: FC-PI-7 (64/32/16G Independent Rx, Tx Rate Select) High=32GFC e 64GFC, Low=16GFC
+    RS_FC_PI_7_INDEPENDENT_RX_TX = 0x10,
+    
+    // 0x11: Não especificado
+    RS_UNSPECIFIED_11 = 0x11,
+    
+    // 0x12-0x1F: Reservados
+    RS_RESERVED_START = 0x12,
+    RS_RESERVED_END   = 0x1F,
+    
+    // 0x20: Rate select baseado em PMDs definidos por A0h, byte 36 e A2h, byte 67
+    RS_PMD_BASED = 0x20,
+    
+    // 0x21-0xFF: Reservados
+    RS_EXTENDED_RESERVED_START = 0x21,
+    RS_EXTENDED_RESERVED_END   = 0xFF
+    
+} sfp_rate_select;
+
+/**********************************************
  * A0h Memory Map (128 bytes) - Base ID Fields
  **********************************************/
 
@@ -369,7 +444,7 @@ typedef struct {
     sfp_nominal_rate_status_t nominal_rate_status;         // Units of 100 MBd
 
     /* Byte 13: Rate Identifier */
-    uint8_t rate_identifier;      // Table 5-6
+    sfp_rate_select rate_select;      // Table 5-6
 
     /*Byte 16: 50 um OM2*/
     uint16_t om2_length_m;           /* Distância convertida (metros) */
@@ -469,6 +544,10 @@ void sfp_print_encoding(sfp_encoding_codes_t encoding);
 void sfp_parse_a0_base_nominal_rate(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
 uint8_t sfp_a0_get_nominal_rate_mbd(const sfp_a0h_base_t *a0, sfp_nominal_rate_status_t *status);
 
+/*Byte 13: Rate Identifier*/
+void sfp_parse_a0_base_rate_identifier(const uint8_t *a0_base_date, sfp_a0h_base_t *a0);
+sfp_rate_select sfp_a0_get_rate_identifier(const sfp_a0h_base_t *a0);
+
 /* Byte 16 OM2 Length Status (50 um)*/
 void sfp_parse_a0_base_om2(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
 uint16_t sfp_a0_get_om2_length_m(const sfp_a0h_base_t *a0, sfp_om2_length_status_t *status);
@@ -485,7 +564,7 @@ uint16_t sfp_a0_get_om4_copper_or_length_m(const sfp_a0h_base_t *a0, sfp_om4_len
 void sfp_parse_a0_base_vendor_name(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
 bool sfp_a0_get_vendor_name(const sfp_a0h_base_t *a0, const char *vendor_name)
 
-/*Byte 36 Extended Compliance Codes) */
+/*Byte 36 Extended Compliance Codes */
 void sfp_parse_a0_base_ext_compliance(const uint8_t *a0_base_data, sfp_a0h_base_t *a0);
 sfp_extended_spec_compliance_code_t sfp_a0_get_ext_compliance(const sfp_a0h_base_t *a0);
 
