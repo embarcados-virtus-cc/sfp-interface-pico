@@ -9,7 +9,7 @@
 #include "ssd1306/ssd1306.h"
 #include "ssd1306/ssd1306_fonts.h"
 #include "joystick/JoystickPi.h"
-#include "sfp_8472/sfp_8472.h"
+#include "sfp_8472/a0h.h"
 
 // ==================== DEFINIÇÕES GERAIS ====================
 #define DISPLAY_WIDTH 128

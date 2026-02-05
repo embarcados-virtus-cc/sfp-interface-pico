@@ -9,7 +9,8 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 
-#include "sfp_8472/sfp_8472.h"
+#include "I2C/i2c.h"
+#include "sfp_8472/a0h.h"
 #include "menu/menu.h"
 
 
@@ -64,8 +65,10 @@ int main(void) {
     sfp_parse_a0_base_identifier(a0_base_data, &system_ctrl.a0);
     
     /*Byte 3 - 10*/
-    sfp_read_compliance(a0_base_data,&system_ctrl.a0.cc);
-    sfp_decode_compliance(&system_ctrl.a0.cc,&system_ctrl.a0.dc);
+    //sfp_read_compliance(a0_base_data,&system_ctrl.a0.cc);
+    //sfp_decode_compliance(&system_ctrl.a0.cc,&system_ctrl.a0.dc);
+    sfp_parse_a0_base_compliance(a0_base_data,&system_ctrl.a0.cc);
+    sfp_a0_decode_compliance(&system_ctrl.a0.cc,&system_ctrl.a0.dc);
     
     /*Byte 11*/
     sfp_parse_a0_base_encoding(a0_base_data,&system_ctrl.a0);

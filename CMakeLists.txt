@@ -15,7 +15,7 @@ project(main C CXX ASM)
 
 pico_sdk_init()
 
-add_executable(main main.c ssd1306/ssd1306.c ssd1306/ssd1306_fonts.c joystick/JoystickPi.c menu/menu.c sfp_8472/sfp_8472.c)
+add_executable(main main.c ssd1306/ssd1306.c ssd1306/ssd1306_fonts.c joystick/JoystickPi.c menu/menu.c I2C/i2c.c sfp_8472/a0h.c  sfp_8472/a2h.c)
 
 pico_set_program_name(main "main.c")
 pico_set_program_version(main "0.1")
