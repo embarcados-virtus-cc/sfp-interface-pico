@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define SFP_I2C_ADDR_A2 0x51
+/*SIZE do Bloco do A2H*/
+#define SFP_A2_SIZE 128
+
 // Estrutura para os Limiares de Alarme e Aviso (Bytes 0-55)
 typedef struct {
     uint16_t temp_high_alarm;    // Bytes 00-01
@@ -65,7 +69,8 @@ typedef struct {
     double laser_temp_wave_opt;   // Bytes 106-107 (Opcional)
     double tec_current_opt;       // Bytes 108-109 (Opcional)
 
-    uint8_t status_control;         // Byte 110 
+   /* uint8_t status_control;         // Byte 110 */
+    bool data_ready;
     //uint8_t reserved_111;          Byte 111
     uint8_t alarm_flags[15];         // Bytes 112-113 
     uint8_t tx_input_eq_ctrl;       // Byte 114 
@@ -93,6 +98,9 @@ typedef struct {
 bool check_sfp_a2h_exists(const uint8_t *a2_data);
 bool get_sfp_vcc(const uint8_t *a2_data, double *vcc);
 
+
+void sfp_parse_a2h_data_ready(const uint8_t *a2_data,sfp_a2h_t *a2);
+bool sfp_a2h_get_data_ready(const sfp_a2h_t *a2);
 
 
 

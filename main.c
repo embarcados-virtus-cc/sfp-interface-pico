@@ -11,6 +11,7 @@
 
 #include "I2C/i2c.h"
 #include "sfp_8472/a0h.h"
+#include "sfp_8472/a2h.h"
 #include "menu/menu.h"
 
 
@@ -57,6 +58,22 @@ int main(void) {
         //printf("ERRO: Falha na leitura do A0h\n");
         while (1);
     }
+    /*Buffer cru(raw) da EEPROM A2H*/
+     uint8_t a2_data[SFP_A2_SIZE];
+
+     ok = sfp_read_block(
+        I2C_PORT,
+        SFP_I2C_ADDR_A2,
+        0x00,
+        a2_data,
+        SFP_A2_SIZE
+    );
+     if(!ok){
+       while(1);
+     }
+ 
+ 
+
     
     // Inicialização de dados do SFP
     init_sfp_data();
