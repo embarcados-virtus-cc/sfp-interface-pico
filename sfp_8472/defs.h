@@ -85,7 +85,7 @@ typedef enum {
     SFP8472_A2_OPT_TEC_CURR          = 108, /* Corrente TEC */
 
     /* Status e Controle [39-42] */
-    SFP8472_A2_STATUS_CONTROL        = 110, /* Bits de status e controle soft  */
+    STATUS_CONTROL        	     = 110, /* Bits de status e controle soft  */
     SFP8472_A2_ALARM_FLAGS           = 112, /* Flags de Alarme */
     SFP8472_A2_TX_INPUT_EQ_CTRL      = 114, /* Controle de Equalização de Entrada */
     SFP8472_A2_RX_OUT_EMPH_CTRL      = 115, /* Controle de Ênfase de Saída  */

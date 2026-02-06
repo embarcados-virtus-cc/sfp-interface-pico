@@ -61,6 +61,23 @@ bool get_sfp_vcc(const uint8_t *a2_data, double *vcc) {
     return true;
 }
 
+/* ============================================
+ * Byte 110 -Data_Not_Ready
+ * ============================================ */
+
+void sfp_parse_a2h_data_ready(const uint8_t *a2_data,sfp_a2h_t *a2){
+   if ((a2_data[STATUS_CONTROL]& (1 << SFP_A2_BIT_DATA_NOT_READY)) == 0) {
+        a2->data_ready = true;  // Dados prontos para leitura
+    }
+   a2->data_ready = false;
+}
+
+bool sfp_a2h_get_data_ready(const sfp_a2h_t *a2){
+  if (!a2){
+    return false;
+  }
+  return a2->data_ready;
+}
 
 
 
