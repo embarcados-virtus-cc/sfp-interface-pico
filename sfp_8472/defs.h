@@ -111,7 +111,7 @@ typedef enum {
     A2_VCC_CURR              = 98,  /* Tensão de alimentação (LSB=100uV) */
     A2_TX_BIAS_CURR          = 100, /* Corrente de Bias do Laser  */
     A2_TX_POWER_CURR         = 102, /* Potência de transmissão  */
-    A2_RX_POWER_CURR         = 104, /* Potência recebida */
+    A2_RX_POWER              = 104, /* Potência recebida */
     A2_OPT_LASER_TEMP_WAVE   = 106, /* Temperatura/Wavelength do Laser  */
     A2_OPT_TEC_CURR          = 108, /* Corrente TEC */
 
