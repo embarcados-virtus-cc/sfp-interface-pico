@@ -65,7 +65,7 @@ typedef struct {
     double vcc_realtime;          // Bytes 98-99
     double tx_bias_realtime;      // Bytes 100-101
     double tx_power_realtime;     // Bytes 102-103
-    double rx_power_realtime;     // Bytes 104-105
+    double rx_power;              // Bytes 104-105
     double laser_temp_wave_opt;   // Bytes 106-107 (Opcional)
     double tec_current_opt;       // Bytes 108-109 (Opcional)
 
@@ -184,6 +184,25 @@ float sfp_a2h_get_rx_power_high_warning(const sfp_a2h_t *a2);
 
 void sfp_parse_a2h_rx_power_low_warning(const uint8_t *a2_data, sfp_a2h_t *a2);
 float sfp_a2h_get_rx_power_low_warning(const sfp_a2h_t *a2);
+
+
+/* ============================================
+ * RX POWER 
+ * ============================================ */
+void sfp_parse_a2h_rx_power(const uint8_t *a2_data, sfp_a2h_t *a2);
+float sfp_a2h_get_rx_power(const sfp_a2h_t *a2);
+float sfp_a2h_get_rx_power_dbm(const sfp_a2h_t *a2);
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
 
 
 #endif

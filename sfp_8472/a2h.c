@@ -1,4 +1,5 @@
 #include "a2h.h"
+#include <math.h>
 
 /* ============================================
  * Byte 00-01 -High Temperature Alarm
@@ -561,6 +562,58 @@ bool get_sfp_vcc(const uint8_t *a2_data, float *vcc) {
     return true;
 }
 
+/* ============================================
+ * Byte 104-105 -RX_POWER
+ * ============================================ */
+ 
+/**
+ * Faz o parse da potência de recepção (RX Power) em tempo real.
+ * @param a2_data Buffer contendo os dados lidos da página A2h.
+ * @param a2 Estrutura para armazenar os dados processados.
+ */
+void sfp_parse_a2h_rx_power(const uint8_t *a2_data, sfp_a2h_t *a2) {
+    if (!a2_data || !a2) {
+        return;
+    }
+
+    uint16_t raw;
+    uint8_t msb = a2_data[A2_RX_POWER];
+    uint8_t lsb = a2_data[A2_RX_POWER + 1];
+
+    raw = (uint16_t)((msb << 8) | lsb);
+
+    /* Converte o valor bruto para microwatts (uW). 
+       O LSB é definido como 0,1 uW. */
+    a2->rx_power = POWER_TO_UW(raw);
+}
+/* ============================================
+ * Função Getter
+ * ============================================ */
+
+/**
+ * Retorna o valor da potência RX processada.
+ * @param a2 Ponteiro para a estrutura de dados do SFP.
+ * @return Valor em uW ou -1 em caso de erro.
+ */
+float sfp_a2h_get_rx_power(const sfp_a2h_t *a2) {
+    if (!a2) {
+        return -1; /* Indica um erro */
+    }
+
+    return a2->rx_power;
+}
+
+float sfp_a2h_get_rx_power_dbm(const sfp_a2h_t *a2){
+  if (!a2) {
+    return -1;
+  }
+  float power_uW = a2->rx_power;
+  if (power_uW <=0.0f) {
+    return -40.0f;/*Piso condizente com a sensibilidade do Módulo*/
+  }else {
+    return 10.0f * log10f(power_uW /1000.0f);
+  }
+}
 
 
 /* ============================================
