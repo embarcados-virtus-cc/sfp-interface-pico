@@ -33,6 +33,8 @@ int main(void) {
     stdio_init_all();
     ssd1306_Init();
     joystickPi_init();
+
+    sleep_ms(2000);/*Delay para inicializar os dados corretamente*/
     
     
     /* Inicializa I2C */
@@ -71,6 +73,15 @@ int main(void) {
      if(!ok){
        while(1);
      }
+
+     sfp_a2h_t a2;
+     sfp_parse_a2h_rx_power(a2_data,&a2);
+     float rx_wm = sfp_a2h_get_rx_power(&a2); 
+     float rx_dbm = sfp_a2h_get_rx_power_dbm(&a2);
+
+     printf("O VALOR RX: %.2f\n",rx_wm);
+     printf("o VALOR RX_DBM: %.2f\n",rx_dbm);
+
  
  
 
