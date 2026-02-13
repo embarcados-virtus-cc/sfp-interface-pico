@@ -608,7 +608,7 @@ float sfp_a2h_get_rx_power_dbm(const sfp_a2h_t *a2){
     return -1;
   }
   float power_uW = a2->rx_power;
-  if (power_uW <=0.0f) {
+  if (power_uW <=1.0f) { /* 0x01 é o valor mínimo do LSB */
     return -40.0f;/*Piso condizente com a sensibilidade do Módulo*/
   }else {
     return 10.0f * log10f(power_uW /1000.0f);
